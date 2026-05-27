@@ -2130,18 +2130,19 @@
             if (piVehicle) piVehicle.innerText = currentUserData.car_type || '—';
             // ===== نهاية ملء بيانات الحساب =====
             
-            const { count: completedCount } = await supabaseClient.from('sh_public_orders').select('*', { count: 'exact', head: true }).eq('driver_id', currentUserData.id).eq('status', 'completed');
-            orderCount = completedCount || 0;
-            document.getElementById('total-orders-count').innerText = orderCount;
+            // FIX: في الخلفية بدون await
+            supabaseClient.from('sh_public_orders').select('*', { count: 'exact', head: true }).eq('driver_id', currentUserData.id).eq('status', 'completed')
+                .then(({ count }) => { orderCount = count || 0; const el = document.getElementById('total-orders-count'); if(el) el.innerText = orderCount; }).catch(()=>{});
             
             if(currentUserData.image_url) { document.getElementById('driver-img-display').src = currentUserData.image_url; }
 
             updateWalletUI();
-            calculateWeeklyRating();
-            fetchInboxMessages();
-            checkDriverFinancing();
-            // ===== تحميل روابط التواصل من إعدادات الإدارة =====
-            try {
+            // FIX: نشغّل الدوال الثقيلة في الخلفية بعد ظهور الواجهة
+            setTimeout(() => { try { calculateWeeklyRating(); } catch(e){} }, 200);
+            setTimeout(() => { try { fetchInboxMessages(); } catch(e){} }, 400);
+            setTimeout(() => { try { checkDriverFinancing(); } catch(e){} }, 600);
+            // ===== تحميل روابط التواصل في الخلفية =====
+            setTimeout(async () => { try {
                 const { data: contactCfg } = await supabaseClient.from('app_config')
                     .select('*')
                     .eq('id', 1).single();
@@ -2169,10 +2170,10 @@
                         }
                     }
                 }
-            } catch(contactErr) { console.warn('contact config:', contactErr); }
+            } catch(contactErr) {} }, 300); // setTimeout app_config
             // ===== نهاية تحميل روابط التواصل =====
-            loadDriverTypeAndAttendance();
-            loadMyDocs();
+            setTimeout(() => { try { loadDriverTypeAndAttendance(); } catch(e){} }, 800);
+            setTimeout(() => { try { loadMyDocs(); } catch(e){} }, 1000);
 
             const savedOrderID = localStorage.getItem('active_order_id');
             const { data: activeOrder } = await supabaseClient.from('sh_public_orders')
@@ -2209,8 +2210,9 @@
             } else {
                 if(document.getElementById('work-status-checkbox')) document.getElementById('work-status-checkbox').checked = false;
                 if(document.getElementById('main-work-status-checkbox')) document.getElementById('main-work-status-checkbox').checked = false;
-                await supabaseClient.from('sh_admin_tracking').upsert({ id: currentUserData.id, status: 'offline' });
-                setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 500); // تتبع حتى لو كان أوفلاين
+                // FIX: بدون await حتى لا يعلّق
+                supabaseClient.from('sh_admin_tracking').upsert({ id: currentUserData.id, status: 'offline' }).then(()=>{}).catch(()=>{});
+                setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 500);
             }
             refreshOrders();
         }
