@@ -420,12 +420,37 @@
     <div id="p-auth" class="page active" style="justify-content: center; align-items: center; text-align: center;">
         <img src="https://i.postimg.cc/QxzPkmPf/Whats-App-Image-2026-04-10-at-6-22-30-PM-t7edrz.jpg" style="width:80px; margin-bottom:12px; border-radius:50%; border:2px solid var(--gold);">
         <h2 style="color:var(--gold); font-size: 16px;">دخول الصقور 🦅</h2>
-        <p style="font-size: 10px; color:#aaa; margin-bottom:12px;">أدخل كود التفعيل (الإيميل اختياري)</p>
-        <input type="email" id="auth-email" class="auth-input" placeholder="البريد الإلكتروني (اختياري)">
-        <input type="text" id="auth-code" class="auth-input" placeholder="كود التفعيل *">
-        <button class="btn-gold" id="login-btn" onclick="login()">دخول النظام</button>
+
+        <!-- تبويبات الدخول -->
+        <div style="display:flex; gap:6px; margin-bottom:14px; background:rgba(255,255,255,0.05); border-radius:10px; padding:4px;">
+            <button id="tab-code" onclick="_switchLoginTab('code')"
+                style="flex:1; padding:7px; border:none; border-radius:8px; font-size:11px; cursor:pointer; background:var(--gold); color:#000; font-weight:bold;">
+                🔑 كود التفعيل
+            </button>
+            <button id="tab-phone" onclick="_switchLoginTab('phone')"
+                style="flex:1; padding:7px; border:none; border-radius:8px; font-size:11px; cursor:pointer; background:transparent; color:#888;">
+                📱 رقم الجوال
+            </button>
+        </div>
+
+        <!-- دخول بالكود -->
+        <div id="login-by-code">
+            <input type="email" id="auth-email" class="auth-input" placeholder="البريد الإلكتروني (اختياري)">
+            <input type="text" id="auth-code" class="auth-input" placeholder="كود التفعيل *">
+        </div>
+
+        <!-- دخول بالجوال -->
+        <div id="login-by-phone" style="display:none;">
+            <input type="tel" id="auth-phone" class="auth-input" placeholder="رقم الجوال * (مثال: 0933xxxxxxx)"
+                   oninput="this.value=this.value.replace(/[^0-9+]/g,'')">
+            <p style="font-size:9px; color:#888; margin:-6px 0 6px;">يجب أن يكون الجوال مسجلاً من قِبل الإدارة</p>
+        </div>
+
+        <button class="btn-gold" id="login-btn" onclick="login()" style="width:100%;">دخول النظام</button>
         <div id="login-error-detail" style="display:none; background:rgba(231,76,60,0.1); border:1px solid #e74c3c; border-radius:10px; padding:10px; margin-top:8px; font-size:9px; color:#e74c3c; text-align:right; line-height:1.7;"></div>
-        <button class="btn-gold" style="background: transparent; color: var(--gold); border: 1px solid var(--gold); margin-top: 8px; font-size: 10px;" onclick="nav('p-register')"><i class="fas fa-user-plus"></i> تسجيل كمندوب جديد 🦅</button>
+        <button class="btn-gold" style="background:transparent; color:var(--gold); border:1px solid var(--gold); margin-top:8px; font-size:10px;" onclick="nav('p-register')">
+            <i class="fas fa-user-plus"></i> تسجيل كمندوب جديد 🦅
+        </button>
     </div>
 
     <div id="p-main" class="page">
@@ -1745,18 +1770,75 @@
         document.getElementById('admin-alert-modal').style.display = 'none';
     }
 
+    // ════ tab switcher ════
+    function _switchLoginTab(tab) {
+        const byCode  = document.getElementById('login-by-code');
+        const byPhone = document.getElementById('login-by-phone');
+        const tabCode  = document.getElementById('tab-code');
+        const tabPhone = document.getElementById('tab-phone');
+        if (tab === 'phone') {
+            byCode.style.display  = 'none';
+            byPhone.style.display = 'block';
+            tabCode.style.background  = 'transparent'; tabCode.style.color  = '#888';
+            tabPhone.style.background = 'var(--gold)';  tabPhone.style.color = '#000';
+            tabPhone.style.fontWeight = 'bold';
+        } else {
+            byCode.style.display  = 'block';
+            byPhone.style.display = 'none';
+            tabCode.style.background  = 'var(--gold)'; tabCode.style.color  = '#000';
+            tabCode.style.fontWeight  = 'bold';
+            tabPhone.style.background = 'transparent'; tabPhone.style.color = '#888';
+        }
+    }
+
     async function login() {
-        const emailRaw = document.getElementById('auth-email').value.trim().toLowerCase();
-        const code = document.getElementById('auth-code').value.trim();
         const btn = document.getElementById('login-btn');
-        // [SEC-FIX-D7] فحص حظر Brute Force
+        // Brute Force check
         const _now = Date.now();
         if (_now < _driverLockUntil) {
-            const secs = Math.ceil((_driverLockUntil - _now) / 1000);
-            siteNotify("⛔ محظور مؤقتاً. انتظر " + secs + " ثانية");
+            siteNotify("⛔ محظور مؤقتاً. انتظر " + Math.ceil((_driverLockUntil - _now)/1000) + " ثانية");
             return;
         }
-        if(!code) { siteNotify("الرجاء إدخل كود التفعيل يا صقر"); return; }
+
+        // ─── تحديد طريقة الدخول ───
+        const byPhone = document.getElementById('login-by-phone');
+        const isPhoneMode = byPhone && byPhone.style.display !== 'none';
+
+        if (isPhoneMode) {
+            // ══ دخول برقم الجوال ══
+            const phone = (document.getElementById('auth-phone')?.value || '').trim();
+            if (!phone) { siteNotify('أدخل رقم الجوال'); return; }
+            btn.disabled = true; btn.innerText = 'جاري البحث...';
+            try {
+                const { data: drivers, error } = await supabaseClient.from('drivers')
+                    .select('*').eq('phone', phone).limit(1);
+                if (error) throw error;
+                if (!drivers || drivers.length === 0) {
+                    // محاولة بدون صفر أول أو مع صفر
+                    const altPhone = phone.startsWith('0') ? phone.slice(1) : '0'+phone;
+                    const { data: drivers2 } = await supabaseClient.from('drivers')
+                        .select('*').eq('phone', altPhone).limit(1);
+                    if (!drivers2 || drivers2.length === 0) {
+                        _driverLoginAttempts++;
+                        if (_driverLoginAttempts >= 5) { _driverLockUntil = Date.now()+60000; _driverLoginAttempts=0; }
+                        siteNotify('رقم الجوال غير مسجل في النظام ❌');
+                        btn.disabled = false; btn.innerText = 'دخول النظام';
+                        return;
+                    }
+                    return _loginWithDriver(drivers2[0], btn);
+                }
+                return _loginWithDriver(drivers[0], btn);
+            } catch(e) {
+                siteNotify('خطأ: ' + (e.message||e));
+                btn.disabled = false; btn.innerText = 'دخول النظام';
+            }
+            return;
+        }
+
+        // ══ دخول بكود التفعيل (الطريقة الأصلية) ══
+        const emailRaw = document.getElementById('auth-email').value.trim().toLowerCase();
+        const code = document.getElementById('auth-code').value.trim();
+        if(!code) { siteNotify("أدخل كود التفعيل"); return; }
         btn.disabled = true; btn.innerText = "جاري التحقق...";
 
         try {
@@ -1798,18 +1880,7 @@
                         return;
                     }
                     if (fallbackDrivers && fallbackDrivers.length > 0) {
-                        const driver = fallbackDrivers[0];
-                        if (driver.status === 'suspended' || driver.status === 'locked') {
-                            document.getElementById('suspend-msg').innerText = "حسابك موقف حالياً، راجع الإدارة";
-                            document.getElementById('suspend-modal').style.display = 'flex';
-                            btn.disabled = false; btn.innerText = "دخول النظام";
-                            return;
-                        }
-                        currentUserData = { ...driver, id: driver.id };
-                        localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
-                        siteNotify("تم تسجيل الدخول بنجاح! 🦅");
-                        initSystem();
-                        return;
+                        return _loginWithDriver(fallbackDrivers[0], btn);
                     }
                     _driverLoginAttempts++;
                     if (_driverLoginAttempts >= 5) { _driverLockUntil = Date.now() + 60000; _driverLoginAttempts = 0; }
@@ -1826,33 +1897,7 @@
             try { drivers = JSON.parse(responseText); } catch(e) { drivers = []; }
 
             if (drivers && drivers.length > 0) {
-                const driver = drivers[0];
-                if (driver.status === 'suspended' || driver.status === 'locked') {
-                    document.getElementById('suspend-msg').innerText = "حسابك موقف حالياً، راجع الإدارة";
-                    document.getElementById('suspend-modal').style.display = 'flex';
-                    btn.disabled = false; btn.innerText = "دخول النظام";
-                    return;
-                }
-                // دخول ناجح
-                currentUserData = { ...driver, id: driver.id };
-                localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
-                siteNotify("تم تسجيل الدخول بنجاح! 🦅");
-                // FIX-LOGIN: GPS في الخلفية بدون تعليق
-                setTimeout(() => {
-                    if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(pos => {
-                            window._lastKnownLat = pos.coords.latitude;
-                            window._lastKnownLng = pos.coords.longitude;
-                            window._lastKnownAccuracy = pos.coords.accuracy;
-                        }, () => {}, { enableHighAccuracy: false, timeout: 5000 });
-                    }
-                }, 2000);
-                // فحص الرصيد فور الدخول
-                if(parseFloat(driver.wallet_balance) <= 0) {
-                    setTimeout(() => showBalanceEmptyModal(), 2000);
-                }
-                initSystem();
-                return;
+                return _loginWithDriver(drivers[0], btn);
             }
 
             // لم يُوجد أي مندوب — نحاول بالكود فقط كـ fallback إذا كان الإيميل مُدخلاً
@@ -1865,18 +1910,7 @@
                     let drivers2 = [];
                     try { drivers2 = await res2.json(); } catch(e) {}
                     if (drivers2 && drivers2.length > 0) {
-                        const driver2 = drivers2[0];
-                        if (driver2.status === 'suspended' || driver2.status === 'locked') {
-                            document.getElementById('suspend-msg').innerText = "حسابك موقف حالياً، راجع الإدارة";
-                            document.getElementById('suspend-modal').style.display = 'flex';
-                            btn.disabled = false; btn.innerText = "دخول النظام";
-                            return;
-                        }
-                        currentUserData = { ...driver2, id: driver2.id };
-                        localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
-                        siteNotify("تم تسجيل الدخول بنجاح! 🦅");
-                        initSystem();
-                        return;
+                        return _loginWithDriver(drivers2[0], btn);
                     }
                 }
             }
@@ -1893,6 +1927,31 @@
             }
             btn.disabled = false; btn.innerText = "دخول النظام";
         }
+    }
+
+    // ════ دالة دخول مشتركة ════
+    function _loginWithDriver(driver, btn) {
+        if (!driver) { siteNotify('بيانات غير صحيحة'); btn.disabled=false; btn.innerText='دخول النظام'; return; }
+        if (driver.status === 'suspended' || driver.status === 'locked') {
+            document.getElementById('suspend-msg').innerText = 'حسابك موقف حالياً، راجع الإدارة';
+            document.getElementById('suspend-modal').style.display = 'flex';
+            btn.disabled = false; btn.innerText = 'دخول النظام';
+            return;
+        }
+        currentUserData = { ...driver, id: driver.id };
+        localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
+        siteNotify('تم تسجيل الدخول بنجاح! 🦅');
+        // GPS في الخلفية
+        setTimeout(() => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => { window._lastKnownLat=pos.coords.latitude; window._lastKnownLng=pos.coords.longitude; },
+                    ()=>{}, { enableHighAccuracy:false, timeout:5000 }
+                );
+            }
+        }, 2000);
+        if (parseFloat(driver.wallet_balance) <= 0) setTimeout(() => showBalanceEmptyModal(), 2000);
+        initSystem();
     }
 
     async function initSystem() {
@@ -5263,22 +5322,22 @@ ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;');
             siteNotify("يرجى إكمال جميع البيانات أولاً"); return;
         }
         if (!regData.workType) { siteNotify("يرجى اختيار نوع العمل ⚠️"); return; }
-        // التحقق من الوثائق
-        if (!regDocFiles.id || !regDocFiles.license || !regDocFiles.selfie) {
-            siteNotify("يرجى رفع جميع الوثائق المطلوبة (هوية + رخصة + صورة شخصية) ⚠️"); return;
-        }
+        // الوثائق اختيارية — لا توقف الإرسال
         const btn = document.getElementById('reg-submit-btn');
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري رفع الوثائق...';
         try {
-            // رفع الوثائق أولاً إلى التخزين السحابي
+            // رفع الوثائق (اختياري — لا يوقف الإرسال)
             const tempId = Date.now().toString();
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري رفع صورة الهوية...';
-            const idUrl = await uploadDocToStorage(regDocFiles.id, tempId, 'national_id');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري رفع رخصة السير...';
-            const licenseUrl = await uploadDocToStorage(regDocFiles.license, tempId, 'driving_license');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري رفع الصورة الشخصية...';
-            const selfieUrl = await uploadDocToStorage(regDocFiles.selfie, tempId, 'selfie');
+            let idUrl = null, licenseUrl = null, selfieUrl = null;
+            if (regDocFiles.id || regDocFiles.license || regDocFiles.selfie) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري رفع الوثائق (اختياري)...';
+                try {
+                    if (regDocFiles.id)      idUrl      = await Promise.race([uploadDocToStorage(regDocFiles.id, tempId, 'national_id'), new Promise(r=>setTimeout(()=>r(null),15000))]);
+                    if (regDocFiles.license) licenseUrl = await Promise.race([uploadDocToStorage(regDocFiles.license, tempId, 'driving_license'), new Promise(r=>setTimeout(()=>r(null),15000))]);
+                    if (regDocFiles.selfie)  selfieUrl  = await Promise.race([uploadDocToStorage(regDocFiles.selfie, tempId, 'selfie'), new Promise(r=>setTimeout(()=>r(null),15000))]);
+                } catch(_docE) { /* الوثائق اختيارية */ }
+            }
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إرسال الطلب...';
 
             // ===== كل البيانات الإضافية تدخل في حقل notes كـ JSON =====
