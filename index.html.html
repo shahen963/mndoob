@@ -1750,19 +1750,15 @@
             const phone = (document.getElementById('auth-phone')?.value || '').trim();
             if (!phone) { siteNotify('أدخل رقم الجوال'); return; }
             btn.disabled = true; btn.innerText = 'جاري البحث...';
-            // [FIX-TIMEOUT] timeout 8 ثواني لمنع التجمد
-            const _t1 = new Promise((_,rej)=>setTimeout(()=>rej(new Error('انتهت مدة الانتظار')),8000));
             try {
-                const { data: drivers, error } = await Promise.race([
-                    supabaseClient.from('drivers').select('*').eq('phone', phone).limit(1), _t1
-                ]);
+                const { data: drivers, error } = await supabaseClient.from('drivers')
+                    .select('*').eq('phone', phone).limit(1);
                 if (error) throw error;
                 if (!drivers || drivers.length === 0) {
+                    // محاولة بدون صفر أول أو مع صفر
                     const altPhone = phone.startsWith('0') ? phone.slice(1) : '0'+phone;
-                    const _t2 = new Promise((_,rej)=>setTimeout(()=>rej(new Error('انتهت مدة الانتظار')),8000));
-                    const { data: drivers2 } = await Promise.race([
-                        supabaseClient.from('drivers').select('*').eq('phone', altPhone).limit(1), _t2
-                    ]);
+                    const { data: drivers2 } = await supabaseClient.from('drivers')
+                        .select('*').eq('phone', altPhone).limit(1);
                     if (!drivers2 || drivers2.length === 0) {
                         _driverLoginAttempts++;
                         if (_driverLoginAttempts >= 5) { _driverLockUntil = Date.now()+60000; _driverLoginAttempts=0; }
@@ -1818,9 +1814,7 @@
                     // [SEC-FIX-D2b] تم إزالة console.log في بيئة الإنتاج
                     let query = supabaseClient.from('drivers').select('*').eq('activation_code', code);
                     if (emailRaw) query = query.eq('email', emailRaw);
-                    // [FIX-TIMEOUT] timeout 8 ثواني
-                    const _tfb = new Promise((_,rej)=>setTimeout(()=>rej(new Error('انتهت مدة الانتظار')),8000));
-                    const { data: fallbackDrivers, error: fallbackErr } = await Promise.race([query.limit(1), _tfb]);
+                    const { data: fallbackDrivers, error: fallbackErr } = await query.limit(1);
                     if (fallbackErr) {
                         siteNotify("⚠️ خطأ في الاتصال بقاعدة البيانات — تأكد من إعدادات RLS في Supabase");
                         btn.disabled = false; btn.innerText = "دخول النظام";
@@ -1878,21 +1872,16 @@
 
     // ════ دالة دخول مشتركة ════
     function _loginWithDriver(driver, btn) {
-        if (!driver) { siteNotify('بيانات غير صحيحة'); if(btn){btn.disabled=false; btn.innerText='دخول النظام';} return; }
+        if (!driver) { siteNotify('بيانات غير صحيحة'); btn.disabled=false; btn.innerText='دخول النظام'; return; }
         if (driver.status === 'suspended' || driver.status === 'locked') {
             document.getElementById('suspend-msg').innerText = 'حسابك موقف حالياً، راجع الإدارة';
             document.getElementById('suspend-modal').style.display = 'flex';
-            if(btn){btn.disabled=false; btn.innerText='دخول النظام';}
+            btn.disabled = false; btn.innerText = 'دخول النظام';
             return;
         }
         currentUserData = { ...driver, id: driver.id };
         localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
-        // [FIX-LOGIN] أطلق الزر وانتقل فوراً — لا تنتظر initSystem
-        if(btn){btn.disabled=false; btn.innerText='دخول النظام';}
         siteNotify('تم تسجيل الدخول بنجاح! 🦅');
-        document.getElementById('p-auth').classList.remove('active');
-        document.getElementById('main-tabs').style.display = 'flex';
-        nav('p-main');
         // GPS في الخلفية
         setTimeout(() => {
             if (navigator.geolocation) {
@@ -1903,8 +1892,7 @@
             }
         }, 2000);
         if (parseFloat(driver.wallet_balance) <= 0) setTimeout(() => showBalanceEmptyModal(), 2000);
-        // initSystem تكمل في الخلفية بعد ظهور الصفحة
-        setTimeout(() => { try { initSystem(); } catch(e){} }, 100);
+        initSystem();
     }
 
     async function initSystem() {
@@ -2129,32 +2117,30 @@
             setTimeout(() => { try { loadMyDocs(); } catch(e){} }, 1000);
 
             const savedOrderID = localStorage.getItem('active_order_id');
-            // [FIX-LOGIN] فحص الطلب النشط في الخلفية بدون تجميد الواجهة
-            supabaseClient.from('sh_public_orders')
-                .select('*').eq('driver_id', currentUserData.id).in('status', ['accepted', 'picked', 'preparing', 'ready']).maybeSingle()
-                .then(({ data: activeOrder }) => {
-                    if(activeOrder) {
-                        currentOrderID = activeOrder.id;
-                        localStorage.setItem('active_order_id', activeOrder.id);
-                        reconnectActiveOrder(activeOrder.id);
-                        nav('p-active-order');
-                    } else if (savedOrderID) {
-                        supabaseClient.from('sh_public_orders').select('*').eq('id', savedOrderID).maybeSingle()
-                            .then(({ data: reCheck }) => {
-                                if(reCheck && ['accepted','picked','preparing','ready'].includes(reCheck.status)) {
-                                    currentOrderID = reCheck.id;
-                                    reconnectActiveOrder(reCheck.id);
-                                    nav('p-active-order');
-                                } else {
-                                    currentOrderID = null;
-                                    localStorage.removeItem('active_order_id');
-                                }
-                            }).catch(()=>{ currentOrderID = null; localStorage.removeItem('active_order_id'); });
-                    } else {
-                        currentOrderID = null;
-                        localStorage.removeItem('active_order_id');
-                    }
-                }).catch(()=>{ currentOrderID = null; localStorage.removeItem('active_order_id'); });
+            const { data: activeOrder } = await supabaseClient.from('sh_public_orders')
+                .select('*').eq('driver_id', currentUserData.id).in('status', ['accepted', 'picked', 'preparing', 'ready']).maybeSingle();
+            
+            if(activeOrder) {
+                currentOrderID = activeOrder.id;
+                localStorage.setItem('active_order_id', activeOrder.id);
+                reconnectActiveOrder(activeOrder.id);
+                nav('p-active-order');
+            } else if (savedOrderID) {
+                const { data: reCheck } = await supabaseClient.from('sh_public_orders').select('*').eq('id', savedOrderID).maybeSingle();
+                if(reCheck && ['accepted', 'picked', 'preparing', 'ready'].includes(reCheck.status)) {
+                    currentOrderID = reCheck.id;
+                    reconnectActiveOrder(reCheck.id);
+                    nav('p-active-order');
+                } else {
+                    currentOrderID = null;
+                    localStorage.removeItem('active_order_id');
+                    nav('p-main');
+                }
+            } else {
+                currentOrderID = null;
+                localStorage.removeItem('active_order_id');
+                nav('p-main');
+            }
             startRefreshTimer();
 
             const savedStatus = localStorage.getItem('shaheen_work_status');
@@ -3850,26 +3836,7 @@
                 // إذا الجدول غير موجود → أرسل رسالة واضحة مع SQL الإنشاء
                 if (error.message && (error.message.includes('does not exist') || error.message.includes('42P01'))) {
                     siteNotify('⚠️ جدول الإقفال غير موجود. شغّل SQL الإعداد من لوحة الإدارة أو Supabase.');
-                    console.error('TABLE MISSING: sh_driver_daily_closings
-SQL:
-CREATE TABLE IF NOT EXISTS public.sh_driver_daily_closings (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  driver_id uuid,
-  driver_name text,
-  closing_date date,
-  closed_at timestamptz DEFAULT now(),
-  orders_count int DEFAULT 0,
-  total_profit numeric DEFAULT 0,
-  total_cash numeric DEFAULT 0,
-  wallet_compensation numeric DEFAULT 0,
-  pending_orders int DEFAULT 0,
-  wallet_balance_start numeric DEFAULT 0,
-  wallet_balance_end numeric DEFAULT 0,
-  wallet_change numeric DEFAULT 0,
-  notes text,
-  created_at timestamptz DEFAULT now()
-);
-ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;');
+                    console.error('TABLE MISSING: sh_driver_daily_closings — run SQL in Supabase to create the table');
                     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> تنفيذ إقفال اليوم'; }
                     return;
                 }
