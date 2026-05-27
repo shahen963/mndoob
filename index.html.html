@@ -1581,7 +1581,13 @@
     const supabaseKey = 'sb_publishable_k6LgEuwPLdCsBMCFC12wfQ_BSOJotuw';
     // [SEC-FIX-D7] Brute Force Protection للمندوبين
     let _driverLoginAttempts = 0, _driverLockUntil = 0;
-    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false
+        }
+    });
     // [SEC-FIX-D1] تم إزالة console.log الذي يكشف نوع مفتاح API في الإنتاج
     // ===== مفتاح Google Maps (اختياري - يُحسّن ETA والمسارات) =====
     // ضع مفتاح Google Maps API هنا للحصول على ETA دقيق مع حركة المرور
@@ -1766,9 +1772,15 @@
                         btn.disabled = false; btn.innerText = 'دخول النظام';
                         return;
                     }
-                    return _loginWithDriver(drivers2[0], btn);
+                    // [FIX-CLONE-D1] تأجير _loginWithDriver بعد انتهاء fetch لتفادي DataCloneError في Supabase Realtime
+                    const _foundDriver2 = drivers2[0];
+                    setTimeout(() => _loginWithDriver(_foundDriver2, btn), 0);
+                    return;
                 }
-                return _loginWithDriver(drivers[0], btn);
+                // [FIX-CLONE-D1] تأجير _loginWithDriver بعد انتهاء fetch لتفادي DataCloneError في Supabase Realtime
+                const _foundDriver = drivers[0];
+                setTimeout(() => _loginWithDriver(_foundDriver, btn), 0);
+                return;
             } catch(e) {
                 siteNotify('خطأ: ' + (e.message||e));
                 btn.disabled = false; btn.innerText = 'دخول النظام';
@@ -3794,6 +3806,8 @@
             const pendingCount = pendingOrders ? pendingOrders.length : 0;
 
             // إنشاء سجل الإقفال
+            // [FIX-PENDING-COL-V2] pending_orders محذوف من السجل لأن العمود غير موجود في جدول قاعدة البيانات
+            // pendingCount يبقى متاحاً كمتغير محلي للعرض فقط
             const closingRecord = {
                 driver_id:              currentUserData.id,
                 driver_name:            currentUserData.name,
@@ -3803,7 +3817,6 @@
                 total_profit:           parseFloat(d.todayProfit.toFixed(2)),
                 total_cash:             parseFloat(d.todayCash.toFixed(2)),
                 wallet_compensation:    parseFloat(d.todayWalletComp.toFixed(2)),
-                pending_orders:         pendingCount,
                 wallet_balance_start:   parseFloat(d.walletStart.toFixed(2)),
                 wallet_balance_end:     parseFloat(d.walletNow.toFixed(2)),
                 wallet_change:          parseFloat((d.walletNow - d.walletStart).toFixed(2)),
@@ -3833,6 +3846,30 @@
                 .insert([closingRecord]);
 
             if (error) {
+                // [FIX-PENDING-COL] إذا كان الخطأ بسبب عمود pending_orders غير موجود → أعد المحاولة بدونه
+                if (error.message && (error.message.includes('pending_orders') || error.message.includes('schema cache'))) {
+                    console.warn('[FIX-PENDING-COL] عمود pending_orders غير موجود في الجدول — إعادة المحاولة بدونه');
+                    const closingRecordWithoutPending = Object.assign({}, closingRecord);
+                    delete closingRecordWithoutPending.pending_orders;
+                    const { error: error2 } = await supabaseClient
+                        .from('sh_driver_daily_closings')
+                        .insert([closingRecordWithoutPending]);
+                    if (error2) {
+                        if (error2.message && (error2.message.includes('does not exist') || error2.message.includes('42P01'))) {
+                            siteNotify('⚠️ جدول الإقفال غير موجود. شغّل SQL الإعداد من لوحة الإدارة أو Supabase.');
+                            console.error('TABLE MISSING: sh_driver_daily_closings — run SQL in Supabase to create the table');
+                            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> تنفيذ إقفال اليوم'; }
+                            return;
+                        }
+                        throw error2;
+                    }
+                    // نجح الإدراج بدون pending_orders
+                    siteNotify('✅ تم إقفال اليوم بنجاح! السجل محفوظ في الأرشيف 🔒');
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> تم إقفال اليوم ✅'; }
+                    window._dcTodayData = null;
+                    setTimeout(() => loadDailyClosingCard(), 1500);
+                    return;
+                }
                 // إذا الجدول غير موجود → أرسل رسالة واضحة مع SQL الإنشاء
                 if (error.message && (error.message.includes('does not exist') || error.message.includes('42P01'))) {
                     siteNotify('⚠️ جدول الإقفال غير موجود. شغّل SQL الإعداد من لوحة الإدارة أو Supabase.');
