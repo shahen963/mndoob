@@ -308,16 +308,80 @@
     </div>
 
     <div id="confirm-modal">
-        <i class="fas fa-handholding-usd" style="font-size: 30px; color: var(--gold); margin-bottom: 10px;"></i>
-        <h3 style="margin: 0 0 6px; font-size: 14px;">تأكيد قبض المبلغ</h3>
-        <p style="font-size: 11px; color: #ccc; margin-bottom: 8px;">هل أنت متأكد يا صقر أنك استلمت المبلغ الكامل من العميل؟</p>
-        <p style="font-size: 10px; color: #e74c3c; font-weight: bold; margin: 6px 0; text-align: center;">⚠️ يرجى التأكد من استلام المبلغ كاملاً قبل المتابعة</p>
-        <div id="cash-to-receive-display" style="background: rgba(212, 175, 55, 0.1); padding: 6px; border-radius: 6px; margin-bottom: 10px; color: var(--gold); font-weight: bold; border: 1px dashed var(--gold); font-size: 12px; display: none;"></div>
-        <input type="text" id="delivery-verify-code" class="auth-input" placeholder="أدخل كود التحقق من العميل" style="margin-top: 4px; border-color: var(--gold); border-style: dashed;">
-        <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button class="btn-gold" id="btn-confirm-delivery" style="margin:0; background: #2ecc71; color: #fff;" onclick="executeFinishOrder()">نعم، استلمت المبلغ كاملاً ✅</button>
-            <button class="btn-gold" style="margin:0; background: #e74c3c; color: #fff;" onclick="closeConfirmModal()">تراجع</button>
+        <!-- ===== رأس النافذة ===== -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:10px;">
+            <div style="width:44px; height:44px; background:linear-gradient(135deg,#1a7a4a,#27ae60); border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 14px rgba(46,204,113,0.5);">
+                <i class="fas fa-hand-holding-usd" style="font-size:20px; color:#fff;"></i>
+            </div>
+            <div style="text-align:right;">
+                <h3 style="margin:0; font-size:15px; color:#fff;">تأكيد قبض المبلغ</h3>
+                <p style="margin:0; font-size:10px; color:#2ecc71;">قبل التسليم — تأكد من كل شيء</p>
+            </div>
         </div>
+
+        <!-- ===== بطاقة العميل والطلب ===== -->
+        <div id="confirm-client-card" style="background:rgba(255,255,255,0.04); border:1px solid rgba(212,175,55,0.3); border-radius:12px; padding:10px 12px; margin-bottom:10px; text-align:right; display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-size:9px; color:#aaa; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:10px;" id="confirm-order-type-badge">🍔 مطعم</span>
+                <div style="font-size:13px; font-weight:bold; color:#fff;" id="confirm-client-name">— العميل —</div>
+            </div>
+            <div style="font-size:10px; color:#aaa;" id="confirm-store-name"></div>
+        </div>
+
+        <!-- ===== بنود الفاتورة المنسّقة ===== -->
+        <div id="confirm-invoice-rows" style="display:none; border-radius:12px; overflow:hidden; margin-bottom:10px; border:1px solid rgba(52,152,219,0.3);">
+            <!-- صف الصيدلية/المطعم -->
+            <div id="confirm-row-items" style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:rgba(0,0,0,0.25); border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="font-size:11px; color:#a8c8ff;" id="confirm-items-label">🛍️ قيمة الطلب</span>
+                <b style="color:#fff; font-size:13px;" id="confirm-x-value">—</b>
+            </div>
+            <!-- صف التوصيل -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:rgba(0,0,0,0.2); border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="font-size:11px; color:#a8c8ff;">🛵 سعر التوصيل</span>
+                <b style="color:var(--gold); font-size:13px;" id="confirm-y-value">—</b>
+            </div>
+            <!-- صف الاستشارة (يختفي إذا لم تكن موجودة) -->
+            <div id="confirm-row-consult" style="display:none; justify-content:space-between; align-items:center; padding:9px 12px; background:rgba(0,0,0,0.2); border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="font-size:11px; color:#f39c12;" id="confirm-consult-label">🩺 رسوم الاستشارة</span>
+                <b style="color:#f39c12; font-size:13px;" id="confirm-consult-value">—</b>
+            </div>
+            <!-- صف الإجمالي -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:11px 12px; background:linear-gradient(135deg,rgba(46,204,113,0.15),rgba(39,174,96,0.1));">
+                <span style="font-size:12px; color:#2ecc71; font-weight:bold;">💰 المجموع من العميل</span>
+                <b style="color:#2ecc71; font-size:18px; font-weight:900;" id="confirm-j-value">—</b>
+            </div>
+        </div>
+
+        <!-- ===== تحذير ===== -->
+        <div style="background:rgba(231,76,60,0.1); border:1px solid rgba(231,76,60,0.3); border-radius:10px; padding:8px 12px; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
+            <i class="fas fa-exclamation-triangle" style="color:#e74c3c; font-size:14px; flex-shrink:0;"></i>
+            <p style="margin:0; font-size:10px; color:#ffb3ae; line-height:1.5;">تأكد من استلام <b>المبلغ كاملاً</b> قبل إدخال الكود. لا يمكن التراجع بعد الضغط على تأكيد.</p>
+        </div>
+
+        <!-- ===== حقل الكود ===== -->
+        <div style="position:relative; margin-bottom:12px;">
+            <i class="fas fa-key" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--gold); font-size:13px;"></i>
+            <input type="text" id="delivery-verify-code" class="auth-input"
+                placeholder="🔑 أدخل كود التحقق من العميل"
+                style="padding-right:35px; border-color:var(--gold); border-style:dashed; letter-spacing:3px; font-size:15px; text-align:center; font-weight:bold; margin:0;">
+        </div>
+
+        <!-- ===== أزرار ===== -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button class="btn-gold" id="btn-confirm-delivery"
+                style="margin:0; background:linear-gradient(135deg,#1a7a4a,#27ae60); color:#fff; padding:12px; font-size:12px; font-weight:bold; border-radius:12px; border:none; box-shadow:0 4px 12px rgba(46,204,113,0.3);"
+                onclick="executeFinishOrder()">
+                <i class="fas fa-check-circle"></i> نعم، قبضت ✅
+            </button>
+            <button class="btn-gold"
+                style="margin:0; background:rgba(231,76,60,0.2); color:#e74c3c; border:1.5px solid #e74c3c; padding:12px; font-size:12px; font-weight:bold; border-radius:12px;"
+                onclick="closeConfirmModal()">
+                <i class="fas fa-times"></i> تراجع
+            </button>
+        </div>
+
+        <!-- العنصر القديم محفوظ للتوافق مع الكود القديم (مخفي) -->
+        <div id="cash-to-receive-display" style="display:none;"></div>
     </div>
 
     <div id="admin-alert-modal">
@@ -781,15 +845,16 @@
         <div class="card">
             <h4 style="color:var(--gold); margin-top:0; font-size: 12px;"><i class="fas fa-headset"></i> الدعم الفني والمساعدة</h4>
             <button class="btn-gold" style="background:#25D366; color:#fff; font-size: 10px;" onclick="openAdminChat()"><i class="fab fa-whatsapp"></i> مراسلة الإدارة العامة</button>
-            <!-- ===== زر قناة التليجرام للمناديب ===== -->
-            <a id="driver-telegram-btn" href="#" target="_blank" style="text-decoration:none; display:block; margin-top:6px;">
-                <button class="btn-gold" style="width:100%; background:linear-gradient(135deg,#1c7bd6,#2ca5e0); color:#fff; font-size:10px; padding:10px; display:flex; align-items:center; justify-content:center; gap:6px; border:none; border-radius:10px; cursor:pointer;">
-                    <i class="fab fa-telegram" style="font-size:14px;"></i> قناة التليجرام 📢
-                </button>
-            </a>
-            <!-- ===== نهاية زر قناة التليجرام ===== -->
+            <!-- ===== FIX-TG-1: زر قناة التليجرام للمناديب (فتح خارجي موثوق) ===== -->
+            <button id="driver-telegram-btn"
+                class="btn-gold"
+                style="width:100%; background:linear-gradient(135deg,#1c7bd6,#2ca5e0); color:#fff; font-size:10px; padding:10px; display:flex; align-items:center; justify-content:center; gap:6px; border:none; border-radius:10px; cursor:pointer; margin-top:6px;"
+                onclick="_openDriverTelegram()">
+                <i class="fab fa-telegram" style="font-size:14px;"></i> قناة التليجرام 📢
+            </button>
+            <!-- ===== نهاية FIX-TG-1 ===== -->
         </div>
-        <!-- ===== قسم التواصل مع الإدارة (واتساب وتليجرام فقط) ===== -->
+        <!-- ===== FIX-TG-2: قسم التواصل — واتساب فقط (التيليجرام مندمج في الدعم الفني أعلاه) ===== -->
         <div class="card" style="margin-top:8px;">
             <h4 style="color:var(--gold); margin-top:0; font-size:12px;"><i class="fas fa-share-alt"></i> تواصل مع الإدارة</h4>
             <div style="display:flex; justify-content:space-around; align-items:center; padding:8px 0;">
@@ -797,10 +862,9 @@
                     <i class="fab fa-whatsapp" style="color:#25d366; font-size:30px;"></i>
                     <span style="font-size:9px; color:#aaa;">واتساب</span>
                 </a>
-                <a id="driver-social-telegram" href="#" target="_blank" style="text-decoration:none; display:flex; flex-direction:column; align-items:center; gap:4px;">
-                    <i class="fab fa-telegram" style="color:#2ca5e0; font-size:30px;"></i>
-                    <span style="font-size:9px; color:#2ca5e0; font-weight:bold;">قناة التليجرام</span>
-                </a>
+                <!-- FIX-TG-2: تم دمج تيليجرام في قسم الدعم الفني أعلاه — لا تكرار -->
+                <!-- id محفوظ للتوافق مع الكود القديم لكن مخفي -->
+                <a id="driver-social-telegram" style="display:none;"></a>
             </div>
         </div>
         <!-- ===== نهاية قسم التواصل ===== -->
@@ -898,11 +962,21 @@
             </button>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px; margin-top:8px;">
-            <button class="btn-gold" style="background:#3498db; color:#fff; font-size:8px;" onclick="openMap('res')"><i class="fas fa-utensils"></i> المتجر</button>
-            <button class="btn-gold" style="font-size:8px;" onclick="openMap('customer')"><i class="fas fa-user-pin"></i> العميل</button>
+        <!-- ===== FIX-LOC-DRV: أزرار موقع العميل والمتجر المحسّنة ===== -->
+        <div id="location-btns-container" style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-top:8px; margin-bottom:4px;">
+            <button class="btn-gold" id="btn-client-loc" style="background:linear-gradient(135deg,#1a7a4a,#27ae60); color:#fff; font-size:9px; padding:8px 4px; border-radius:10px; border:1px solid #2ecc71;" onclick="openMap('customer')">
+                <i class="fas fa-map-marker-alt" style="color:#2ecc71;"></i> 📍 موقع العميل
+                <div id="client-gps-indicator" style="font-size:7px;color:#a8ffcb;display:none;">GPS محفوظ ✅</div>
+            </button>
+            <button class="btn-gold" id="btn-store-loc" style="background:linear-gradient(135deg,#0a3d7a,#1a5db5); color:#fff; font-size:9px; padding:8px 4px; border-radius:10px; border:1px solid #3498db;" onclick="openMap('res')">
+                <i class="fas fa-store" style="color:#74b9ff;"></i> 🏪 موقع المتجر
+                <div id="store-gps-indicator" style="font-size:7px;color:#a8d5ff;display:none;">GPS محفوظ ✅</div>
+            </button>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 3px; margin-bottom:6px;">
             <button class="btn-gold" style="background:#f39c12; color:#fff; font-size:8px;" onclick="openAdminChat()"><i class="fas fa-headset"></i> الإدارة</button>
         </div>
+        <!-- ===== نهاية أزرار الموقع ===== -->
 
         <div class="chat-area">
             <div id="chat-content" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 12px;">
@@ -1809,7 +1883,7 @@
             btn.disabled = false; btn.innerText = "دخول النظام";
 
         } catch (err) {
-            console.error("Login error:", err);
+            // [FIX-SEC-D1] console.error محذوف في الإنتاج
             if (err.name === 'AbortError') {
                 siteNotify("انتهت مدة الانتظار — تحقق من الاتصال بالإنترنت ثم أعد المحاولة");
             } else {
@@ -1867,7 +1941,14 @@
                         if(document.getElementById('wallet-positive-rect')) document.getElementById('wallet-positive-rect').classList.remove('blurred-profit');
                     }
                 })
-                .subscribe();
+                .subscribe((status, err) => {
+                    // [FIX-CHAT-D3] إعادة الاتصال عند انقطاع قناة المحفظة
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        setTimeout(() => {
+                            if (currentUserData) updateWalletUI();
+                        }, 3000);
+                    }
+                });
 
             supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime'));
             supabaseClient
@@ -1930,7 +2011,16 @@
                     }
                     refreshOrders();
                 })
-                .subscribe();
+                .subscribe((status, err) => {
+                    // [FIX-CHAT-D2] إعادة الاتصال التلقائي عند انقطاع قناة الطلبات
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        setTimeout(() => {
+                            try { supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime')); } catch(e){}
+                            supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime'));
+                            if (currentUserData) refreshOrders();
+                        }, 3000);
+                    }
+                });
 
             // ===== Realtime لطلبات التمويل: تختفي/تظهر الأيقونة فوراً =====
             supabaseClient.channel('financing-status-realtime')
@@ -2004,9 +2094,10 @@
                     }
                     // ===== رابط قناة التليجرام من نفس الـ select('*') =====
                     if (contactCfg.driver_telegram_channel) {
-                        const tgBtn    = document.getElementById('driver-telegram-btn');
+                        // FIX-TG-4: حفظ رابط التيليجرام في المتغير للفتح الموثوق
+                        _driverTgUrl = contactCfg.driver_telegram_channel;
+                        // الحفاظ على التوافق مع الكود القديم
                         const tgSocial = document.getElementById('driver-social-telegram');
-                        if (tgBtn)    tgBtn.href    = contactCfg.driver_telegram_channel;
                         if (tgSocial) tgSocial.href = contactCfg.driver_telegram_channel;
                     }
                 }
@@ -2784,7 +2875,10 @@
         }
     }
 
+    let _refreshOrdersLock = false; // [FIX-D1] guard ضد race condition
     async function refreshOrders() {
+        if (_refreshOrdersLock) return;
+        _refreshOrdersLock = true;
         // إعادة ضبط العداد وشريط التحديث من الصفر
         refreshProgress = 0;
         const refreshBarEl = document.getElementById('refresh-bar');
@@ -2830,7 +2924,7 @@
         if(error) {
             if(refreshBarEl) { refreshBarEl.style.width = '100%'; }
             list.innerHTML = "<div style='text-align:center; color:#e74c3c; margin-top:50px;'>حدث خطأ أثناء جلب الطلبات، تأكد من اتصالك</div>";
-            return;
+            _refreshOrdersLock = false; return; // [FIX-D1]
         }
 
         if(filteredData && filteredData.length > 0) {
@@ -2915,6 +3009,7 @@
             if(refreshBarEl) { refreshBarEl.style.width = '100%'; }
             list.innerHTML = "<div style='text-align:center; color:#555; margin-top:50px;'><i class='fas fa-info-circle' style='font-size:22px; display:block; margin-bottom:8px;'></i> لا يوجد طلبات متاحة حالياً.. ابقَ متيقظاً يا صقر 🦅</div>";
         }
+        _refreshOrdersLock = false; // [FIX-D6] reset lock
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -2923,8 +3018,12 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
+    let _acceptOrderPending = false; // [FIX-D2]
     async function acceptOrder(id, restaurantName) {
+        if (_acceptOrderPending) return;
         if(currentOrderID) return siteNotify("أنهِ الطلب الحالي أولاً يا صقر! 🦅");
+        _acceptOrderPending = true;
+        setTimeout(() => { _acceptOrderPending = false; }, 8000); // reset تلقائي بعد 8 ثواني
         // ===== تسجيل القبول لمندوب الدوام =====
         const _acceptTime = Date.now();
         if (!window._acceptedOrderIds) window._acceptedOrderIds = new Set();
@@ -3060,7 +3159,37 @@
         const _driverLatAtAccept = window._lastKnownLat || null;
         const _driverLngAtAccept = window._lastKnownLng || null;
 
-        const { error: error1 } = await supabaseClient.from('sh_public_orders').update({ 
+        // ===== FIX-LOC-DRIVER: نسخ موقع المتجر من المطعم إلى الطلب عند القبول =====
+        let _storePickupLat = null, _storePickupLng = null, _storeResAddr = null;
+        try {
+            // جلب بيانات الطلب لمعرفة restaurant_id
+            const { data: _orderForStore } = await supabaseClient
+                .from('sh_public_orders')
+                .select('restaurant_id, pickup_lat, pickup_lng, res_address, res_type')
+                .eq('id', id).maybeSingle();
+            // إذا الطلب لم تكن له إحداثيات متجر — نجلبها من جدول المطاعم
+            if (_orderForStore && !_orderForStore.pickup_lat && _orderForStore.restaurant_id) {
+                const _resTbl = (_orderForStore.res_type === 'pharmacy' || _orderForStore.res_type === 'pharmacy_delivery')
+                    ? 'pharmacies' : 'restaurants';
+                const { data: _resRow } = await supabaseClient
+                    .from(_resTbl)
+                    .select('pickup_lat, pickup_lng, maps_url, res_address, address')
+                    .eq('id', _orderForStore.restaurant_id).maybeSingle();
+                if (_resRow) {
+                    _storePickupLat  = _resRow.pickup_lat  || null;
+                    _storePickupLng  = _resRow.pickup_lng  || null;
+                    _storeResAddr    = _resRow.res_address || _resRow.address || _resRow.maps_url || null;
+                }
+            } else if (_orderForStore) {
+                // الإحداثيات موجودة بالفعل في الطلب
+                _storePickupLat = _orderForStore.pickup_lat;
+                _storePickupLng = _orderForStore.pickup_lng;
+                _storeResAddr   = _orderForStore.res_address;
+            }
+        } catch (_locErr) {}
+        // ===== نهاية FIX-LOC-DRIVER =====
+
+        const _acceptUpdate = { 
             status: 'accepted', 
             driver_id: currentUserData.id, 
             driver_phone: driverPhone,
@@ -3069,7 +3198,11 @@
             accepted_at: _acceptedAtTime,
             driver_lat_at_accept: _driverLatAtAccept,
             driver_lng_at_accept: _driverLngAtAccept
-        }).eq('id', id);
+        };
+        if (_storePickupLat) { _acceptUpdate.pickup_lat = _storePickupLat; _acceptUpdate.pickup_lng = _storePickupLng; }
+        if (_storeResAddr)   { _acceptUpdate.res_address = _storeResAddr; }
+
+        const { error: error1 } = await supabaseClient.from('sh_public_orders').update(_acceptUpdate).eq('id', id);
         
         const { error: error2 } = await supabaseClient.from('orders').update({ 
             status: 'accepted', 
@@ -3086,8 +3219,20 @@
             // ===== تسجيل قبول الطلب في سجل الدوام =====
             const _respSeconds = window._orderShownAt && window._orderShownAt[id]
                 ? Math.round((_acceptTime - window._orderShownAt[id]) / 1000) : 0;
-            const { data: _acceptedOrderData } = await supabaseClient.from('sh_public_orders').select('created_at,restaurant_name,res,customer_name').eq('id', id).maybeSingle();
+            const { data: _acceptedOrderData } = await supabaseClient.from('sh_public_orders').select('created_at,restaurant_name,res,customer_name,customer_id').eq('id', id).maybeSingle();
             if (_acceptedOrderData) await _logAcceptedOrderDuringShift(id, _acceptedOrderData, _respSeconds);
+            // ===== FIX-ACCEPT-1: إرسال إشعار للعميل فوراً عند القبول =====
+            try {
+                if (_acceptedOrderData && _acceptedOrderData.customer_id) {
+                    await supabaseClient.from('notifications').insert([{
+                        user_id: _acceptedOrderData.customer_id,
+                        message: '✅ تم قبول طلبك من قبل المندوب ' + driverName + '! هو في الطريق إليك 🦅',
+                        is_read: false,
+                        created_at: new Date().toISOString()
+                    }]);
+                }
+            } catch(_nErr) {}
+            // ===== نهاية إشعار العميل =====
             // ===== نهاية تسجيل الدوام =====
             // ===== تسجيل موقع القبول وبدء مسار التتبع المتقدم =====
             _recordOrderAcceptLocation(id);
@@ -3096,6 +3241,8 @@
             initSystem(); 
             nav('p-active-order');
             refreshOrders();
+            // ===== FIX-POLL-DRV: بدء Polling احتياطي للطلب النشط =====
+            _startActiveOrderPoll(id);
             siteNotify("تم قنص الطلب بنجاح! 🦅");
         } else {
             const errMsg = error1?.message || error2?.message || "فشل القنص";
@@ -3149,8 +3296,10 @@
             localStorage.removeItem('active_order_id');
             const modal = document.getElementById('cancel-order-modal');
             if(modal) modal.remove();
+            // ===== FIX-DRV-2: فتح صفحة الطلبات فوراً بعد الإلغاء =====
+            if (window._delivPollInterval) { clearInterval(window._delivPollInterval); window._delivPollInterval = null; }
             nav('p-main');
-            refreshOrders();
+            setTimeout(() => refreshOrders(), 200);
         } catch(err) {
             siteNotify("فشل الإلغاء: " + err.message);
             if(btn) { btn.disabled = false; btn.innerText = "تأكيد الإلغاء"; }
@@ -3273,7 +3422,22 @@
                         _updateDriverTrackingCard(lat, lng, pos.coords.speed);
                     }
 
-                } catch(e) { console.warn('GPS upsert error:', e); }
+                } catch(e) {
+                    // [FIX-GPS-D5] معالجة خطأ GPS upsert - retry مرة واحدة
+                    if (!navigator.onLine) return; // لا نُعيد عند انقطاع الإنترنت
+                    setTimeout(async () => {
+                        try {
+                            await supabaseClient.from(_TRACK_TABLE).upsert({
+                                id: currentUserData.id,
+                                lat: window._lastKnownLat || lat,
+                                lng: window._lastKnownLng || lng,
+                                last_seen: new Date().toISOString(),
+                                name: currentUserData.name,
+                                status: localStorage.getItem('shaheen_work_status') || 'offline'
+                            });
+                        } catch(retryE) {}
+                    }, 2000);
+                }
             }, (err) => {
                 console.warn('GPS error:', err.code, err.message);
                 // Fallback: حاول كل 10 ثواني عند فشل watchPosition
@@ -3550,6 +3714,10 @@
 
     // إيقاف مسار الطلب عند اكتماله
     async function _closeDriverPath(orderId) {
+        // [FIX-D3] تنظيف الـ timers المرتبطة بالطلب
+        if (window._distanceUpdateTimer) { clearInterval(window._distanceUpdateTimer); window._distanceUpdateTimer = null; }
+        if (window._trackingCardUpdateTimer) { clearInterval(window._trackingCardUpdateTimer); window._trackingCardUpdateTimer = null; }
+        _acceptOrderPending = false; // [FIX-D2] reset
         if (!currentUserData) return;
         try {
             await supabaseClient.from(_PATH_TABLE).update({
@@ -3954,6 +4122,20 @@
     
     async function logout() {
         if(confirm("هل تريد تسجيل الخروج يا صقر؟ لن يضيع طلبك المستلم 🦅")) {
+            // [FIX-D5] تنظيف شامل قبل الخروج
+            if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+            if (window._trackingPeriodicTimer)  { clearInterval(window._trackingPeriodicTimer); window._trackingPeriodicTimer = null; }
+            if (window._trackingKeepAliveTimer) { clearInterval(window._trackingKeepAliveTimer); window._trackingKeepAliveTimer = null; }
+            if (window._trackingWatchdogTimer)  { clearInterval(window._trackingWatchdogTimer); window._trackingWatchdogTimer = null; }
+            if (window._trackingFallbackTimer)  { clearInterval(window._trackingFallbackTimer); window._trackingFallbackTimer = null; }
+            if (window._distanceUpdateTimer)    { clearInterval(window._distanceUpdateTimer); window._distanceUpdateTimer = null; }
+            if (window._trackingCardUpdateTimer){ clearInterval(window._trackingCardUpdateTimer); window._trackingCardUpdateTimer = null; }
+            if (window._orderElapsedTimer)      { clearInterval(window._orderElapsedTimer); window._orderElapsedTimer = null; }
+            if (window._statusCheckInterval)    { clearInterval(window._statusCheckInterval); window._statusCheckInterval = null; }
+            if (window._shiftTimer)             { clearInterval(window._shiftTimer); window._shiftTimer = null; }
+            if (window._shiftHeartbeat)         { clearInterval(window._shiftHeartbeat); window._shiftHeartbeat = null; }
+            if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
+            _refreshOrdersLock = false; _acceptOrderPending = false; _finishOrderPending = false;
             await supabaseClient.auth.signOut();
             localStorage.removeItem('shaheen_driver');
             localStorage.removeItem('shaheen_work_status');
@@ -3963,46 +4145,94 @@
 
     async function openConfirmModal() {
         if(!currentOrderID) return;
-        const { data: order } = await supabaseClient.from('sh_public_orders').select('total, delivery_price, consultation_fee, consult_pay_by_points, order_details, res_type, customer_name').eq('id', currentOrderID).single();
+        const { data: order } = await supabaseClient.from('sh_public_orders')
+            .select('total, delivery_price, consultation_fee, consult_pay_by_points, order_details, res_type, restaurant_name, customer_name, customer_address')
+            .eq('id', currentOrderID).single();
         if(order) {
-            const isPharmacyType = (order.res_type === 'pharmacy' || order.res_type === 'pharmacy_delivery');
-            // ===== استخراج فاتورة الصيدلية من order_details =====
+            // ─── نوع الطلب ───
+            const isPharmacy = (order.res_type === 'pharmacy' || order.res_type === 'pharmacy_delivery');
+            const isFlowers  = order.res_type === 'flowers';
+            const isSweets   = order.res_type === 'sweets';
+            const isWassayni = order.res_type === 'wassayni';
+            const isSpecialty= order.res_type === 'specialty';
+
+            // ─── أيقونة ونوع ───
+            let _typeIcon  = '🍔';
+            let _typeLabel = 'مطعم';
+            let _itemsLabel = '🛍️ قيمة الطلب';
+            if (isPharmacy) { _typeIcon='💊'; _typeLabel='صيدلية'; _itemsLabel='💊 فاتورة الصيدلية'; }
+            else if (isFlowers)  { _typeIcon='🌸'; _typeLabel='ورود';    _itemsLabel='🌸 قيمة الطلب'; }
+            else if (isSweets)   { _typeIcon='🍬'; _typeLabel='حلويات';  _itemsLabel='🍬 قيمة الطلب'; }
+            else if (isWassayni) { _typeIcon='📦'; _typeLabel='وصيني';   _itemsLabel='📦 قيمة المهمة'; }
+            else if (isSpecialty){ _typeIcon='🛍️'; _typeLabel='متجر';   _itemsLabel='🛍️ قيمة الطلب'; }
+
+            // ─── حساب المبالغ ───
             let X = 0;
-            if (isPharmacyType && order.order_details) {
-                const match = order.order_details.match(/PHARMACY_TOTAL:(\d+(\.\d+)?)/);
-                if (match) { X = parseFloat(match[1]); }
+            if (isPharmacy && order.order_details) {
+                const _m = order.order_details.match(/PHARMACY_TOTAL:(\d+(\.\d+)?)/);
+                if (_m) X = parseFloat(_m[1]);
             }
             if (X === 0) {
-                // احسب X = الإجمالي - التوصيل - الاستشارة
-                const _consultFeeCalc = parseFloat(order.consultation_fee) || 0;
-                const rawX = (parseFloat(order.total) || 0) - (parseFloat(order.delivery_price) || 0) - _consultFeeCalc;
-                X = rawX > 0 ? rawX : (parseFloat(order.total) || 0);
+                const _cf = parseFloat(order.consultation_fee) || 0;
+                const _raw = (parseFloat(order.total)||0) - (parseFloat(order.delivery_price)||0) - _cf;
+                X = _raw > 0 ? _raw : (parseFloat(order.total)||0);
             }
             const Y = parseFloat(order.delivery_price) || 0;
-            // ===== رسوم الاستشارة كبند منفصل =====
             const _consultFee = parseFloat(order.consultation_fee) || 0;
             const _paidByPoints = order.consult_pay_by_points === true;
-            // المبلغ الذي يجب تحصيله كاشاً = صيدلية + توصيل + (استشارة إذا لم تُدفع بالنقاط)
-            const _consultCashAmount = _paidByPoints ? 0 : _consultFee;
-            const J = X + Y + _consultCashAmount;
-            if(document.getElementById('confirm-x-value')) document.getElementById('confirm-x-value').innerText = X.toLocaleString() + ' ل.س';
-            if(document.getElementById('confirm-y-value')) document.getElementById('confirm-y-value').innerText = Y.toLocaleString() + ' ل.س';
-            if(document.getElementById('confirm-j-value')) document.getElementById('confirm-j-value').innerText = J.toLocaleString() + ' ل.س';
-            document.getElementById('cash-to-receive-display').style.display = 'block';
-            const _confirmCustomerName = order.customer_name || 'العميل';
-            // ===== عرض تفصيلي واضح للفاتورة (3 بنود) =====
-            let _displayText = `💊 فاتورة الصيدلية: ${X.toLocaleString()} ل.س\n`;
-            _displayText += `🛵 سعر التوصيل: ${Y.toLocaleString()} ل.س`;
-            if (_consultFee > 0) {
-                if (_paidByPoints) {
-                    _displayText += `\n🩺 رسوم الاستشارة: ${_consultFee.toLocaleString()} ل.س ✅ مدفوعة بالنقاط`;
+            const _consultCash = _paidByPoints ? 0 : _consultFee;
+            const J = X + Y + _consultCash;
+
+            // ─── تعبئة بطاقة العميل ───
+            const _clientCard = document.getElementById('confirm-client-card');
+            const _clientNameEl = document.getElementById('confirm-client-name');
+            const _storeNameEl  = document.getElementById('confirm-store-name');
+            const _typeBadgeEl  = document.getElementById('confirm-order-type-badge');
+            if (_clientCard) {
+                _clientCard.style.display = 'block';
+                if (_clientNameEl) _clientNameEl.innerText = order.customer_name || '—';
+                if (_storeNameEl)  _storeNameEl.innerText  = _typeIcon + ' ' + (order.restaurant_name || '—') + (order.customer_address ? '  |  📍 ' + order.customer_address : '');
+                if (_typeBadgeEl)  _typeBadgeEl.innerText  = _typeIcon + ' ' + _typeLabel;
+            }
+
+            // ─── تعبئة بنود الفاتورة ───
+            const _invoiceRows = document.getElementById('confirm-invoice-rows');
+            if (_invoiceRows) _invoiceRows.style.display = 'block';
+
+            const _itemsLabelEl   = document.getElementById('confirm-items-label');
+            const _xEl = document.getElementById('confirm-x-value');
+            const _yEl = document.getElementById('confirm-y-value');
+            const _jEl = document.getElementById('confirm-j-value');
+            const _consultRow  = document.getElementById('confirm-row-consult');
+            const _consultLbl  = document.getElementById('confirm-consult-label');
+            const _consultVal  = document.getElementById('confirm-consult-value');
+
+            if (_itemsLabelEl) _itemsLabelEl.innerText = _itemsLabel;
+            if (_xEl) _xEl.innerText = X.toLocaleString('ar-SA') + ' ل.س';
+            if (_yEl) _yEl.innerText = Y.toLocaleString('ar-SA') + ' ل.س';
+            if (_jEl) _jEl.innerText = J.toLocaleString('ar-SA') + ' ل.س';
+
+            // ─── صف الاستشارة ───
+            if (_consultRow) {
+                if (_consultFee > 0) {
+                    _consultRow.style.display = 'flex';
+                    if (_consultLbl) _consultLbl.innerText = _paidByPoints ? '🩺 رسوم الاستشارة' : '🩺 رسوم الاستشارة (كاش)';
+                    if (_consultVal) _consultVal.innerText = _paidByPoints
+                        ? _consultFee.toLocaleString('ar-SA') + ' ل.س ✅ نقاط'
+                        : _consultFee.toLocaleString('ar-SA') + ' ل.س';
                 } else {
-                    _displayText += `\n🩺 رسوم الاستشارة: ${_consultFee.toLocaleString()} ل.س (كاش)`;
+                    _consultRow.style.display = 'none';
                 }
             }
-            _displayText += `\n────────────────\n💰 المجموع الكاش من العميل: ${J.toLocaleString()} ل.س`;
-            document.getElementById('cash-to-receive-display').innerText = _displayText;
+
+            // الحفاظ على توافق الكود القديم
+            if (document.getElementById('cash-to-receive-display')) {
+                document.getElementById('cash-to-receive-display').style.display = 'none';
+            }
         }
+        // تصفير حقل الكود
+        const _codeInput = document.getElementById('delivery-verify-code');
+        if (_codeInput) _codeInput.value = '';
         document.getElementById('confirm-modal').classList.add('active');
     }
 
@@ -4011,11 +4241,14 @@
         document.getElementById('delivery-verify-code').value = "";
     }
 
+    let _finishOrderPending = false; // [FIX-D4]
     async function executeFinishOrder() {
+        if (_finishOrderPending) return;
         const inputCodeField = document.getElementById('delivery-verify-code');
         const inputCode = inputCodeField.value.trim();
         const btn = document.getElementById('btn-confirm-delivery');
         if(!inputCode) { siteNotify("يرجى إدخل كود التحقق من العميل"); return; }
+        _finishOrderPending = true;
         btn.disabled = true;
         btn.innerText = "جاري التسجيل...";
         try {
@@ -4023,7 +4256,7 @@
             if(fetchErr || !order) throw new Error("لم يتم العثور على الطلب");
             if(order.verify_code != inputCode) {
                 siteNotify("كود التحقق غير صحيح! تأكد من العميل");
-                btn.disabled = false; btn.innerText = "نعم، قبضت";
+                _finishOrderPending = false; btn.disabled = false; btn.innerText = "نعم، قبضت"; // [FIX-D4]
                 return;
             }
             const deliveryPrice = parseFloat(order.delivery_price) || 0;
@@ -4207,12 +4440,17 @@
             closeConfirmModal();
             updateWalletUI();
             initSystem();
-            // إذا نفد الرصيد بعد هذا الطلب، نظهر موال التحذير
+            // ===== FIX-DRV-1: بعد التسليم → فتح صفحة الطلبات الجديدة فوراً =====
+            // تنظيف polling interval
+            if (window._delivPollInterval) { clearInterval(window._delivPollInterval); window._delivPollInterval = null; }
+            refreshOrders(); // تحديث قائمة الطلبات فوراً
             if(newBal <= 0) {
                 nav('p-wallet');
                 setTimeout(() => showBalanceEmptyModal(), 1000);
             } else {
-                nav('p-wallet');
+                // الانتقال لصفحة الطلبات الجديدة مباشرة
+                nav('p-main');
+                siteNotify('✅ تم التسليم! يمكنك الآن قنص طلب جديد 🦅');
             }
         } catch (err) {
             siteNotify("خطأ: " + err.message);
@@ -4314,6 +4552,11 @@
                 const waUrl = `https://wa.me/${order.phone}`;
                 if(document.getElementById('whatsapp-direct-btn-large')) document.getElementById('whatsapp-direct-btn-large').onclick = () => window.open(waUrl);
             }
+            // ===== FIX-LOC-DRV-2: إظهار مؤشر GPS للعميل والمتجر =====
+            const _clientGpsBadge = document.getElementById('client-gps-indicator');
+            const _storeGpsBadge = document.getElementById('store-gps-indicator');
+            if (_clientGpsBadge) _clientGpsBadge.style.display = (order.lat && order.lng) ? 'block' : 'none';
+            if (_storeGpsBadge) _storeGpsBadge.style.display = (order.pickup_lat && order.pickup_lng) ? 'block' : 'none';
             // ===== تشغيل عداد وقت الطلب وتتبع المسافة =====
             startOrderTimer(order.accepted_at || null, order);
             // تحديث المسافة عند كل تحديث GPS
@@ -4340,10 +4583,18 @@
         if(error || !order) {
             document.getElementById('pharmacy-invoice-content').innerText = "لم يتم العثور على تفاصيل للفاتورة في النظام.";
         } else {
-            // ===== تعديل: عنوان الفاتورة ديناميكي باسم العميل =====
             const _invCustomerName = order.customer_name || 'العميل';
+            const _invRestaurantForTitle = order.restaurant_name || order.res || order.res_name || 'المتجر';
             const _invTitleEl = document.getElementById('dynamic-invoice-title');
-            if (_invTitleEl) _invTitleEl.innerText = '🧾 فاتورة ' + _invCustomerName;
+            // ===== FIX-INV-1: عنوان الفاتورة = "فاتورة توصيل - اسم العميل" =====
+            const _invTypePrefix = (order.res_type === 'pharmacy' || order.res_type === 'pharmacy_delivery') ? '🏥 صيدلية' :
+                                   (order.res_type === 'flowers') ? '🌸 ورود' :
+                                   (order.res_type === 'sweets') ? '🍬 حلويات' :
+                                   (order.res_type === 'wassayni') ? '📦 وصيني' :
+                                   (order.res_type === 'specialty') ? '🛍️ متجر' : '🍔 مطعم';
+            const _invTitle = `🧾 فاتورة توصيل - ${_invCustomerName}`;
+            const _invSubTitle = `${_invTypePrefix}: ${_invRestaurantForTitle}`;
+            if (_invTitleEl) { _invTitleEl.innerHTML = _invTitle + '<br><small style="font-size:12px;color:#aaa;">' + _invSubTitle + '</small>'; }
             // ===== تعديل: عرض البيانات الأساسية + الأصناف مع الأسعار =====
             const _invDeliveryPrice = parseFloat(order.delivery_price) || 0;
             const _invTotal = parseFloat(order.total) || 0;
@@ -4394,18 +4645,50 @@
                     ? `\n🩺 رسوم الاستشارة: ${_consultFeeFromDB.toLocaleString()} ل.س ✅ مدفوعة بنقاط شاهين`
                     : `\n🩺 رسوم الاستشارة: ${_consultFeeFromDB.toLocaleString()} ل.س (كاش)`;
             }
-            // ===== بناء نص الفاتورة الكامل =====
-            let _invSummary = `👤 اسم العميل: ${_invCustomerName}\n🏪 المتجر: ${_invRestaurant}\n────────────────────\n`;
+            // ===== FIX-INV-2: عرض الفاتورة بـ HTML منسّق مع اسم العميل والمجموع والتوصيل =====
+            const _grandTotal2 = isPharmacyInv ? (_pharmacyOnlyInv + _invDeliveryPrice + _consultCashInv) : _invTotal;
+            const _invContentEl = document.getElementById('pharmacy-invoice-content');
+            const _invAddrStr = order.customer_address ? `<div style="margin:4px 0;font-size:12px;color:#ccc;">📍 ${order.customer_address}</div>` : '';
+            let _invRowsHtml = '';
             if (isPharmacyInv) {
-                _invSummary += `💊 فاتورة الصيدلية: ${_pharmacyOnlyInv.toLocaleString()} ل.س\n`;
-                _invSummary += `🚗 سعر التوصيل: ${_invDeliveryPrice.toLocaleString()} ل.س`;
-                _invSummary += _consultFeeLineInv;
-                _invSummary += `\n────────────────────\n💰 المجموع الكاش: ${_grandTotalInv.toLocaleString()} ل.س`;
+                _invRowsHtml = `
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(212,175,55,0.2);">
+                        <span style="color:#aaa;">💊 فاتورة الصيدلية</span>
+                        <b>${_pharmacyOnlyInv.toLocaleString()} ل.س</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(212,175,55,0.2);">
+                        <span style="color:#aaa;">🛵 سعر التوصيل</span>
+                        <b style="color:var(--gold);">${_invDeliveryPrice.toLocaleString()} ل.س</b>
+                    </div>
+                    ${_consultFeeFromDB > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(212,175,55,0.2);">
+                        <span style="color:#f39c12;">🩺 رسوم الاستشارة</span>
+                        <b style="color:#f39c12;">${_consultFeeFromDB.toLocaleString()} ل.س ${_paidByPointsInv ? '(نقاط ✅)' : '(كاش)'}</b>
+                    </div>` : ''}
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid var(--gold);margin-top:4px;">
+                        <b style="color:var(--gold);font-size:14px;">💰 الإجمالي الكاش</b>
+                        <b style="color:var(--gold);font-size:16px;">${_grandTotal2.toLocaleString()} ل.س</b>
+                    </div>`;
             } else {
-                _invSummary += `🚗 سعر التوصيل: ${_invDeliveryPrice.toLocaleString()} ل.س\n────────────────────\n💰 المجموع الكلي: ${_invTotal.toLocaleString()} ل.س`;
+                _invRowsHtml = `
+                    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(212,175,55,0.2);">
+                        <span style="color:#aaa;">🛵 سعر التوصيل</span>
+                        <b style="color:var(--gold);">${_invDeliveryPrice.toLocaleString()} ل.س</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid var(--gold);margin-top:4px;">
+                        <b style="color:var(--gold);font-size:14px;">💰 الإجمالي</b>
+                        <b style="color:var(--gold);font-size:16px;">${_grandTotal2.toLocaleString()} ل.س</b>
+                    </div>`;
             }
-            _invSummary += _invItemsText;
-            document.getElementById('pharmacy-invoice-content').innerText = _invSummary;
+            const _invItemsHtml = _invItemsText ? `<div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:10px;margin-top:10px;white-space:pre-wrap;font-size:11px;color:#ddd;">${_invItemsText.trim()}</div>` : '';
+            _invContentEl.innerHTML = `
+                <div style="background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.3);border-radius:12px;padding:12px;margin-bottom:10px;">
+                    <div style="font-size:14px;font-weight:bold;color:#fff;margin-bottom:4px;">👤 ${_invCustomerName}</div>
+                    ${_invAddrStr}
+                    <div style="font-size:11px;color:#aaa;">🏪 ${_invRestaurant}</div>
+                </div>
+                <div style="text-align:left;">${_invRowsHtml}</div>
+                ${_invItemsHtml}
+            `;
         }
     }
 
@@ -4414,9 +4697,32 @@
         const { data: order } = await supabaseClient.from('sh_public_orders').select('*').eq('id', currentOrderID).single();
         if(!order) return;
         
-        // --- ثانياً: تحويل Google Maps - فتح مسار كامل (متجر → عميل) ---
+        // ===== FIX-MAP-1: فتح Google Maps بالإحداثيات الدقيقة دائماً =====
         if(target === 'customer') {
-            // إذا توفر موقع المتجر وموقع العميل، يتم فتح مسار كامل
+            // الأولوية: إحداثيات GPS محفوظة من جانب العميل
+            if(order.lat && order.lng) {
+                const mapsUrl = `https://www.google.com/maps?q=${order.lat},${order.lng}&z=17`;
+                window.open(mapsUrl);
+                siteNotify('📍 فتح موقع العميل على خرائط جوجل 🗺️');
+                return;
+            }
+            // احتياط: اسم العنوان
+            const query = order.customer_address || "موقع العميل";
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+            siteNotify('📍 البحث عن عنوان العميل على الخريطة');
+        } else if(target === 'res' || target === 'store') {
+            // موقع المتجر/المطعم من الإدارة
+            if(order.pickup_lat && order.pickup_lng) {
+                window.open(`https://www.google.com/maps?q=${order.pickup_lat},${order.pickup_lng}&z=17`);
+                siteNotify('🏪 فتح موقع المتجر على خرائط جوجل 🗺️');
+                return;
+            }
+            // احتياط: موقع المتجر من الإعداد
+            const storeQuery = order.res_address || order.restaurant_name || order.res || order.res_name || "المطعم";
+            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeQuery)}`);
+            siteNotify('🏪 البحث عن موقع المتجر على الخريطة');
+        } else {
+            // مسار كامل: متجر → عميل
             if(order.pickup_lat && order.pickup_lng && order.lat && order.lng) {
                 const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${order.pickup_lat},${order.pickup_lng}&destination=${order.lat},${order.lng}&travelmode=driving`;
                 window.open(mapsUrl);
@@ -4428,17 +4734,52 @@
             }
             const query = order.customer_address || "موقع العميل";
             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
-        } else {
-            // موقع المتجر فقط
-            if(order.pickup_lat && order.pickup_lng) {
-                window.open(`https://www.google.com/maps?q=${order.pickup_lat},${order.pickup_lng}`);
-                return;
-            }
-            const query = order.res_address || order.restaurant_name || order.res || order.res_name || "المتجر";
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
         }
     }
     
+    // ===== FIX-TG-3: دالة فتح قناة التيليجرام للمندوب (خارجياً موثوق) =====
+    let _driverTgUrl = '';
+
+    function _openDriverTelegram() {
+        if (!_driverTgUrl || _driverTgUrl === '#') {
+            siteNotify('رابط قناة التليجرام غير محدد من الإدارة بعد');
+            return;
+        }
+        // محاولة 1: intent مباشر لتطبيق Telegram
+        const tgIntent = _driverTgUrl.replace('https://t.me/', 'tg://resolve?domain=')
+                                      .replace('https://telegram.me/', 'tg://resolve?domain=');
+        // إذا الرابط يحتوي t.me → نفتح intent أولاً ثم رابط الويب كـ fallback
+        try {
+            window.open(_driverTgUrl, '_blank', 'noopener,noreferrer');
+        } catch(e) {
+            window.location.href = _driverTgUrl;
+        }
+    }
+    // ===== نهاية FIX-TG-3 =====
+
+    // ===== FIX-POLL-DRV: Polling احتياطي سريع للطلب النشط =====
+    function _startActiveOrderPoll(orderId) {
+        if (window._activePollInterval) clearInterval(window._activePollInterval);
+        window._activePollInterval = setInterval(async () => {
+            if (!currentOrderID) { clearInterval(window._activePollInterval); return; }
+            try {
+                const { data: _pOrd } = await supabaseClient
+                    .from('sh_public_orders').select('status, restaurant_note, order_details')
+                    .eq('id', orderId).maybeSingle();
+                if (!_pOrd) return;
+                if (_pOrd.status === 'cancelled') {
+                    clearInterval(window._activePollInterval);
+                    siteNotify('تم إلغاء الطلب ❌');
+                    currentOrderID = null; localStorage.removeItem('active_order_id');
+                    nav('p-main'); refreshOrders();
+                } else if (_pOrd.status === 'completed') {
+                    clearInterval(window._activePollInterval);
+                }
+            } catch(e) {}
+        }, 5000);
+    }
+    // ===== نهاية Polling الطلب النشط =====
+
     function sendMsg() { }
     function sendQuickMsg(txt) { }
     function sendPhotoMsg(input) { }
@@ -5005,7 +5346,7 @@
 
             // فحص حجم notes — إذا تجاوز 500KB نحذف الوثائق ونحفظها بشكل منفصل
             const notesSizeKB = Math.round(notesData.length / 1024);
-            console.log('notes size KB:', notesSizeKB);
+            // [FIX-SEC-D1b] console.log محذوف في الإنتاج
             let finalNotes = notesData;
             if (notesSizeKB > 500) {
                 // الحجم كبير — نحفظ فقط نوع العمل في notes وترسل الوثائق عبر واتساب
@@ -5027,7 +5368,7 @@
                 timestamp:    new Date().toISOString()
             };
             
-            console.log("Sending payload:", JSON.stringify(insertPayload));
+            // [FIX-SEC-D1c] console.log محذوف
 
             // إرسال مباشر بـ fetch بدون supabaseClient لتجنب مشكلة التجمد
             const controller = new AbortController();
@@ -5048,8 +5389,8 @@
             clearTimeout(timeoutId);
 
             const responseText = await response.text();
-            console.log("Response status:", response.status);
-            console.log("Response body:", responseText);
+            // [FIX-SEC-D1d] console.log محذوف
+            // [FIX-SEC-D1e] console.log محذوف
 
             if (!response.ok) {
                 let errDetail = responseText;
@@ -5104,7 +5445,7 @@
             setTimeout(() => { nav('p-auth'); }, 2000);
         } catch (err) {
             const errMsg = err.name === 'AbortError' ? 'انتهت مدة الانتظار (10 ثواني) — تحقق من الاتصال بالإنترنت' : (err.message || err.toString() || "خطأ غير معروف");
-            console.error("Registration error full:", err);
+            // [FIX-SEC-D1f] console.error محذوف
             // عرض رسالة خطأ واضحة ومفصلة في الشاشة
             siteNotify("فشل الإرسال: " + errMsg);
             // عرض تفاصيل إضافية في عنصر مرئي أسفل الزر
@@ -6043,6 +6384,28 @@
         applyStoredScale();
         initSystem();
     });
+
+    // [FIX-ONLINE-D6] مراقبة حالة الاتصال في تطبيق المندوب
+    window.addEventListener('unhandledrejection', function(event) {
+        event.preventDefault();
+    });
+    window.addEventListener('offline', function() {
+        siteNotify('⚠️ انقطع الاتصال — سيعود تلقائياً');
+    });
+    window.addEventListener('online', function() {
+        siteNotify('✅ عاد الاتصال');
+        if (currentUserData) refreshOrders();
+        if (currentOrderID) reconnectActiveOrder(currentOrderID);
+    });
+
+        // [FIX-VIS-D4] إعادة تشغيل نظام الطلبات عند العودة للتبويب
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible' && currentUserData) {
+            refreshOrders();
+            if (currentOrderID) reconnectActiveOrder(currentOrderID);
+        }
+    });
+
 </script>
 </body>
 </html>
