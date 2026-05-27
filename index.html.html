@@ -1736,7 +1736,7 @@
         await supabaseClient.from('sh_admin_tracking').upsert({ id: currentUserData.id, status: statusText });
         // تم تعطيل إيقاف التتبع عند إغلاق الحالة لضمان التتبع الدائم
         // if (!status) { if(gpsWatch) navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
-        if (status) startAdminTracking();
+        if (status) setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 300);
         siteNotify(status ? "أنت الآن متاح لاستقبال الطلبات 🦅" : "تم إيقاف استقبال الطلبات حالياً");
         refreshOrders(); 
     }
@@ -1837,14 +1837,16 @@
                 currentUserData = { ...driver, id: driver.id };
                 localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
                 siteNotify("تم تسجيل الدخول بنجاح! 🦅");
-                // طلب صلاحية GPS فوراً عند تسجيل الدخول
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(pos => {
-                        window._lastKnownLat = pos.coords.latitude;
-                        window._lastKnownLng = pos.coords.longitude;
-                        window._lastKnownAccuracy = pos.coords.accuracy;
-                    }, () => {}, { enableHighAccuracy: true, timeout: 10000 });
-                }
+                // FIX-LOGIN: GPS في الخلفية بدون تعليق
+                setTimeout(() => {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(pos => {
+                            window._lastKnownLat = pos.coords.latitude;
+                            window._lastKnownLng = pos.coords.longitude;
+                            window._lastKnownAccuracy = pos.coords.accuracy;
+                        }, () => {}, { enableHighAccuracy: false, timeout: 5000 });
+                    }
+                }, 2000);
                 // فحص الرصيد فور الدخول
                 if(parseFloat(driver.wallet_balance) <= 0) {
                     setTimeout(() => showBalanceEmptyModal(), 2000);
@@ -1897,7 +1899,8 @@
         const saved = localStorage.getItem('shaheen_driver');
         if(saved) {
             currentUserData = JSON.parse(saved);
-            startAdminTracking(); // بدء التتبع الدائم فور تشغيل النظام
+            // FIX-LOGIN: تأجير التتبع لمنع تعليق صفحة الدخول
+            setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 1500);
 
             // --- فحص دوري لحالة المندوب كل 15 ثانية كـ fallback إذا الـ realtime لم يشتغل ---
             if(window._statusCheckInterval) clearInterval(window._statusCheckInterval);
@@ -2143,12 +2146,12 @@
             if (savedStatus === 'online') {
                 if(document.getElementById('work-status-checkbox')) document.getElementById('work-status-checkbox').checked = true;
                 if(document.getElementById('main-work-status-checkbox')) document.getElementById('main-work-status-checkbox').checked = true;
-                startAdminTracking();
+                setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 500);
             } else {
                 if(document.getElementById('work-status-checkbox')) document.getElementById('work-status-checkbox').checked = false;
                 if(document.getElementById('main-work-status-checkbox')) document.getElementById('main-work-status-checkbox').checked = false;
                 await supabaseClient.from('sh_admin_tracking').upsert({ id: currentUserData.id, status: 'offline' });
-                startAdminTracking(); // تتبع حتى لو كان أوفلاين
+                setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 500); // تتبع حتى لو كان أوفلاين
             }
             refreshOrders();
         }
@@ -3359,15 +3362,12 @@
         // ===== طلب إذن الموقع مرة واحدة فقط عند أول تشغيل =====
         const permKey = 'shaheen_gps_perm_granted';
         if (!localStorage.getItem(permKey)) {
-            try {
-                await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(
-                        pos => { localStorage.setItem(permKey, '1'); resolve(pos); },
-                        err => { console.warn('GPS permission denied:', err); resolve(null); },
-                        { enableHighAccuracy: true, timeout: 10000 }
-                    );
-                });
-            } catch(e) {}
+            // FIX-LOGIN: لا نُعلّق هنا - طلب GPS في الخلفية
+            navigator.geolocation?.getCurrentPosition(
+                pos => { localStorage.setItem(permKey, '1'); },
+                () => {},
+                { enableHighAccuracy: false, timeout: 5000 }
+            );
         }
         if (navigator.geolocation) {
             if(gpsWatch) navigator.geolocation.clearWatch(gpsWatch);
