@@ -2094,11 +2094,17 @@
                     }
                     // ===== رابط قناة التليجرام من نفس الـ select('*') =====
                     if (contactCfg.driver_telegram_channel) {
-                        // FIX-TG-4: حفظ رابط التيليجرام في المتغير للفتح الموثوق
+                        // FIX-TG-PERSIST: حفظ رابط التيليجرام في المتغير + localStorage بشكل دائم
                         _driverTgUrl = contactCfg.driver_telegram_channel;
-                        // الحفاظ على التوافق مع الكود القديم
+                        localStorage.setItem('shaheen_tg_channel', contactCfg.driver_telegram_channel);
                         const tgSocial = document.getElementById('driver-social-telegram');
                         if (tgSocial) tgSocial.href = contactCfg.driver_telegram_channel;
+                    } else {
+                        // fallback: إذا لم يُرسل الـ config هذه المرة، نستعيد من localStorage
+                        const _cachedTg = localStorage.getItem('shaheen_tg_channel');
+                        if (_cachedTg && _cachedTg !== '') {
+                            _driverTgUrl = _cachedTg;
+                        }
                     }
                 }
             } catch(contactErr) { console.warn('contact config:', contactErr); }
@@ -3294,10 +3300,16 @@
             siteNotify("تم إلغاء الطلب. سبب الإلغاء تم حفظه. 🦅");
             currentOrderID = null;
             localStorage.removeItem('active_order_id');
+            // ===== FIX-ORDERS-BAR-CANCEL: تصفير قفلات شريط الطلبات =====
+            _finishOrderPending = false;
+            _acceptOrderPending = false;
+            _refreshOrdersLock  = false;
+            if (window._delivPollInterval)  { clearInterval(window._delivPollInterval);  window._delivPollInterval  = null; }
+            if (window._activePollInterval) { clearInterval(window._activePollInterval); window._activePollInterval = null; }
+            if (!refreshInterval) startRefreshTimer();
+            // ===== نهاية FIX-ORDERS-BAR-CANCEL =====
             const modal = document.getElementById('cancel-order-modal');
             if(modal) modal.remove();
-            // ===== FIX-DRV-2: فتح صفحة الطلبات فوراً بعد الإلغاء =====
-            if (window._delivPollInterval) { clearInterval(window._delivPollInterval); window._delivPollInterval = null; }
             nav('p-main');
             setTimeout(() => refreshOrders(), 200);
         } catch(err) {
@@ -4439,17 +4451,26 @@
             if(document.getElementById('toggle-res-status-btn')) document.getElementById('toggle-res-status-btn').style.display = 'none';
             closeConfirmModal();
             updateWalletUI();
+            // ===== FIX-ORDERS-BAR: تصفير كامل قبل initSystem لضمان بقاء شريط الطلبات =====
+            currentOrderID = null;
+            localStorage.removeItem('active_order_id');
+            _finishOrderPending = false;
+            _acceptOrderPending = false;
+            _refreshOrdersLock  = false;
+            // إيقاف polling intervals القديمة
+            if (window._delivPollInterval)  { clearInterval(window._delivPollInterval);  window._delivPollInterval  = null; }
+            if (window._activePollInterval) { clearInterval(window._activePollInterval); window._activePollInterval = null; }
+            if (window._statusCheckInterval){ clearInterval(window._statusCheckInterval); window._statusCheckInterval = null; }
+            // إعادة تشغيل شريط التحديث إذا توقف
+            if (!refreshInterval) startRefreshTimer();
+            // ===== نهاية FIX-ORDERS-BAR =====
             initSystem();
-            // ===== FIX-DRV-1: بعد التسليم → فتح صفحة الطلبات الجديدة فوراً =====
-            // تنظيف polling interval
-            if (window._delivPollInterval) { clearInterval(window._delivPollInterval); window._delivPollInterval = null; }
-            refreshOrders(); // تحديث قائمة الطلبات فوراً
             if(newBal <= 0) {
                 nav('p-wallet');
                 setTimeout(() => showBalanceEmptyModal(), 1000);
             } else {
-                // الانتقال لصفحة الطلبات الجديدة مباشرة
                 nav('p-main');
+                setTimeout(() => refreshOrders(), 300);
                 siteNotify('✅ تم التسليم! يمكنك الآن قنص طلب جديد 🦅');
             }
         } catch (err) {
@@ -4738,7 +4759,8 @@
     }
     
     // ===== FIX-TG-3: دالة فتح قناة التيليجرام للمندوب (خارجياً موثوق) =====
-    let _driverTgUrl = '';
+    // FIX-TG-PERSIST: استعادة رابط التيليجرام من localStorage فور التحميل
+    let _driverTgUrl = localStorage.getItem('shaheen_tg_channel') || '';
 
     function _openDriverTelegram() {
         if (!_driverTgUrl || _driverTgUrl === '#') {
