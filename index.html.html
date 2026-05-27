@@ -918,66 +918,7 @@
         </div>
 
         <!-- ===== بطاقة التتبع الحي ===== -->
-        <div id="order-tracking-card" style="display:none; background:linear-gradient(135deg,rgba(142,68,173,0.15),rgba(30,10,30,0.9)); border:1px solid #8e44ad; border-radius:14px; padding:10px; margin-top:8px;">
-            <!-- الصف الأول: وقت القنص + العداد -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <div style="text-align:center;">
-                    <div style="font-size:8px; color:#aaa;">⏱️ وقت الاستلام</div>
-                    <div id="order-accepted-time" style="font-size:11px; color:var(--gold); font-weight:bold;">--:--</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:8px; color:#aaa;">⏳ الوقت المنقضي</div>
-                    <div id="order-elapsed-timer" style="font-size:14px; color:#e74c3c; font-weight:bold; font-family:monospace;">00:00</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:8px; color:#aaa;">📍 دقة GPS</div>
-                    <div id="order-gps-accuracy" style="font-size:11px; color:#2ecc71; font-weight:bold;">---</div>
-                </div>
-            </div>
-            <!-- شريط التقدم -->
-            <div style="background:rgba(255,255,255,0.1); border-radius:10px; height:6px; margin-bottom:8px; overflow:hidden;">
-                <div id="order-progress-bar" style="height:100%; background:linear-gradient(90deg,#8e44ad,var(--gold)); border-radius:10px; transition:width 1s linear; width:0%;"></div>
-            </div>
-            <!-- الصف الثاني: موقع المندوب + المسافة -->
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="text-align:center;">
-                    <div style="font-size:8px; color:#aaa;">🦅 موقعك الحالي</div>
-                    <div id="order-driver-location" style="font-size:9px; color:#fff;">جاري التحديد...</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:8px; color:#aaa;">📏 المسافة للعميل</div>
-                    <div id="order-distance-to-client" style="font-size:11px; color:var(--gold); font-weight:bold;">---</div>
-                </div>
-                <div>
-                    <button onclick="_openLiveTrackingMap()" style="background:rgba(52,152,219,0.2);border:1px solid #3498db;color:#3498db;padding:5px 8px;border-radius:8px;font-size:8px;cursor:pointer;">
-                        🗺️ مساري
-                    </button>
-                </div>
-            </div>
-            <!-- ===== بطاقة ETA المتقدمة ===== -->
-            <div id="live-eta-card" style="display:none; background:rgba(0,0,0,0.3); border-radius:10px; padding:8px; margin-top:8px; border:1px solid rgba(52,152,219,0.3);">
-                <div style="font-size:9px; color:#3498db; font-weight:bold; margin-bottom:6px;"><i class="fas fa-route"></i> وضع التوصيل المباشر</div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-                    <div style="text-align:center; background:rgba(52,152,219,0.1); border-radius:8px; padding:6px;">
-                        <div style="font-size:7px; color:#aaa;">🎯 الوجهة</div>
-                        <div id="driver-dest-display" style="font-size:9px; color:#3498db; font-weight:bold;">---</div>
-                    </div>
-                    <div style="text-align:center; background:rgba(46,204,113,0.1); border-radius:8px; padding:6px;">
-                        <div style="font-size:7px; color:#aaa;">⏱️ الوقت المتوقع</div>
-                        <div id="driver-eta-display" style="font-size:12px; color:#2ecc71; font-weight:bold;">---</div>
-                    </div>
-                    <div style="text-align:center; background:rgba(212,175,55,0.1); border-radius:8px; padding:6px;">
-                        <div style="font-size:7px; color:#aaa;">📏 المسافة</div>
-                        <div id="driver-dist-display" style="font-size:11px; color:var(--gold); font-weight:bold;">---</div>
-                    </div>
-                    <div style="text-align:center; background:rgba(142,68,173,0.1); border-radius:8px; padding:6px;">
-                        <div style="font-size:7px; color:#aaa;">🏎️ السرعة</div>
-                        <div id="driver-speed-display" style="font-size:11px; color:#8e44ad; font-weight:bold;">---</div>
-                    </div>
-                </div>
-            </div>
-            <!-- ===== نهاية بطاقة ETA ===== -->
-        </div>
+        <!-- [REMOVED] order-tracking-card محذوفة بناءً على طلب الإدارة -->
 
         <div id="active-bill-info" style="font-size: 9px; margin-top:6px; color:#aaa; background: rgba(212, 175, 55, 0.05); padding: 6px; border-radius: 8px;"></div>
 
@@ -3682,109 +3623,11 @@
     // ===== دوال التتبع الحي للمندوب =====
     
     // بدء عداد وقت الطلب
-    function startOrderTimer(acceptedAtISO, orderData) {
-        // إظهار بطاقة التتبع
-        const card = document.getElementById('order-tracking-card');
-        if (card) card.style.display = 'block';
-        
-        // عرض وقت الاستلام
-        const acceptedTimeEl = document.getElementById('order-accepted-time');
-        if (acceptedTimeEl && acceptedAtISO) {
-            const acceptedDate = new Date(acceptedAtISO);
-            acceptedTimeEl.innerText = acceptedDate.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-        } else if (acceptedTimeEl) {
-            acceptedTimeEl.innerText = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-        }
-        
-        // بدء العداد التصاعدي
-        if (window._orderElapsedTimer) clearInterval(window._orderElapsedTimer);
-        const startTime = acceptedAtISO ? new Date(acceptedAtISO).getTime() : Date.now();
-        
-        window._orderElapsedTimer = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
-            const secs = (elapsed % 60).toString().padStart(2, '0');
-            const elapsedEl = document.getElementById('order-elapsed-timer');
-            if (elapsedEl) {
-                elapsedEl.innerText = `${mins}:${secs}`;
-                // تغيير اللون حسب الوقت
-                if (elapsed < 600) elapsedEl.style.color = '#2ecc71';       // أقل من 10 دقائق - أخضر
-                else if (elapsed < 1200) elapsedEl.style.color = '#f39c12'; // 10-20 دقيقة - برتقالي
-                else elapsedEl.style.color = '#e74c3c';                      // أكثر من 20 دقيقة - أحمر
-            }
-            // شريط التقدم (30 دقيقة = 100%)
-            const progressEl = document.getElementById('order-progress-bar');
-            if (progressEl) {
-                const pct = Math.min((elapsed / 1800) * 100, 100);
-                progressEl.style.width = pct + '%';
-            }
-        }, 1000);
-    }
-    
-    // إيقاف عداد الطلب
-    function stopOrderTimer() {
-        if (window._orderElapsedTimer) { clearInterval(window._orderElapsedTimer); window._orderElapsedTimer = null; }
-        const card = document.getElementById('order-tracking-card');
-        if (card) card.style.display = 'none';
-    }
-    
-    // تحديث المسافة من المندوب إلى العميل
-    function _updateDistanceToClient(clientLat, clientLng) {
-        if (!clientLat || !clientLng || window._lastKnownLat === undefined) return;
-        const dist = calculateDistance(window._lastKnownLat, window._lastKnownLng, clientLat, clientLng);
-        const distEl = document.getElementById('order-distance-to-client');
-        if (distEl) distEl.innerText = dist.toFixed(2) + ' كم';
-        
-        // تحديث الموقع النصي
-        const locEl = document.getElementById('order-driver-location');
-        if (locEl) locEl.innerText = window._lastKnownLat.toFixed(4) + ' , ' + window._lastKnownLng.toFixed(4);
-        
-        // تحديث دقة GPS
-        const accEl = document.getElementById('order-gps-accuracy');
-        if (accEl && window._lastKnownAccuracy) {
-            const acc = Math.round(window._lastKnownAccuracy);
-            accEl.innerText = acc + 'م';
-            accEl.style.color = acc < 20 ? '#2ecc71' : acc < 50 ? '#f39c12' : '#e74c3c';
-        }
-    }
-    
-    // فتح خريطة المسار الحي
-    function _openLiveTrackingMap() {
-        if (window._lastKnownLat === undefined) { siteNotify('جاري تحديد موقعك...'); return; }
-        // فتح Google Maps بموقع المندوب الحالي مع الاتجاه
-        const heading = window._lastKnownHeading || 0;
-        const url = `https://www.google.com/maps/dir/?api=1&origin=${window._lastKnownLat},${window._lastKnownLng}&travelmode=driving`;
-        window.open(url, '_blank');
-    }
-    
-    // ===== تحديث بطاقة ETA وبطاقة التتبع معاً =====
-    if (!window._trackingCardUpdateTimer) {
-        window._trackingCardUpdateTimer = setInterval(() => {
-            if (!currentUserData || window._lastKnownLat === undefined) return;
-            // تحديث دقة GPS في بطاقة التتبع
-            const accEl = document.getElementById('order-gps-accuracy');
-            if (accEl && window._lastKnownAccuracy !== undefined) {
-                const acc = Math.round(window._lastKnownAccuracy);
-                accEl.innerText = acc + 'م';
-                accEl.style.color = acc < 20 ? '#2ecc71' : acc < 50 ? '#f39c12' : '#e74c3c';
-            }
-            // تحديث الموقع النصي
-            const locEl = document.getElementById('order-driver-location');
-            if (locEl && window._lastKnownLat) {
-                locEl.innerText = window._lastKnownLat.toFixed(4) + ' , ' + window._lastKnownLng.toFixed(4);
-            }
-            // إظهار/إخفاء بطاقة ETA
-            const etaCard = document.getElementById('live-eta-card');
-            if (etaCard) etaCard.style.display = currentOrderID ? 'block' : 'none';
-            // مؤشر الحركة/التوقف
-            const speedEl = document.getElementById('driver-speed-display');
-            if (speedEl && !currentOrderID) {
-                const spd = window._lastKnownSpeed || 0;
-                speedEl.innerText = `${Math.round(spd * 3.6)} كم/س`;
-                speedEl.style.color = _isMoving ? '#2ecc71' : '#888';
-            }
-        }, 3000);
-    }
+    // [REMOVED] startOrderTimer / stopOrderTimer / _updateDistanceToClient / _openLiveTrackingMap / _trackingCardUpdateTimer — محذوفة بناءً على طلب الإدارة
+    function startOrderTimer() {}
+    function stopOrderTimer() {}
+    function _updateDistanceToClient() {}
+    function _openLiveTrackingMap() {}
 
     async function generateSettlementCode() {
         if (settlementTimer) return;
@@ -3966,6 +3809,23 @@
                 wallet_change:          parseFloat((d.walletNow - d.walletStart).toFixed(2)),
                 notes:                  null
             };
+
+            // [FIX-TABLE-AUTO] إنشاء الجدول تلقائياً إذا لم يكن موجوداً
+            try {
+                await supabaseClient.rpc('exec_sql', { sql: `
+                    CREATE TABLE IF NOT EXISTS public.sh_driver_daily_closings (
+                      id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+                      driver_id uuid, driver_name text, closing_date date,
+                      closed_at timestamptz DEFAULT now(), orders_count int DEFAULT 0,
+                      total_profit numeric DEFAULT 0, total_cash numeric DEFAULT 0,
+                      wallet_compensation numeric DEFAULT 0, pending_orders int DEFAULT 0,
+                      wallet_balance_start numeric DEFAULT 0, wallet_balance_end numeric DEFAULT 0,
+                      wallet_change numeric DEFAULT 0, notes text,
+                      created_at timestamptz DEFAULT now()
+                    );
+                    ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;
+                `});
+            } catch(_autoCreate) { /* إذا RPC غير متاح — نكمل ونحاول الـ insert مباشرة */ }
 
             // إنشاء الجدول تلقائياً إذا لم يكن موجوداً (عبر RPC أو مباشرة)
             const { error } = await supabaseClient
@@ -4556,20 +4416,7 @@ ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;');
             if (_clientGpsBadge) _clientGpsBadge.style.display = (order.lat && order.lng) ? 'block' : 'none';
             if (_storeGpsBadge) _storeGpsBadge.style.display = (order.pickup_lat && order.pickup_lng) ? 'block' : 'none';
             // ===== تشغيل عداد وقت الطلب وتتبع المسافة =====
-            startOrderTimer(order.accepted_at || null, order);
-            // تحديث المسافة عند كل تحديث GPS
-            if (order.lat && order.lng) {
-                window._activeOrderClientLat = order.lat;
-                window._activeOrderClientLng = order.lng;
-                _updateDistanceToClient(order.lat, order.lng);
-                // تحديث المسافة كل 10 ثواني
-                if (window._distanceUpdateTimer) clearInterval(window._distanceUpdateTimer);
-                window._distanceUpdateTimer = setInterval(() => {
-                    if (window._activeOrderClientLat && window._lastKnownLat !== undefined) {
-                        _updateDistanceToClient(window._activeOrderClientLat, window._activeOrderClientLng);
-                    }
-                }, 10000);
-            }
+            // [REMOVED] startOrderTimer / _updateDistanceToClient محذوفة
         }
     }
 
@@ -4740,19 +4587,24 @@ ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;');
     let _driverTgUrl = localStorage.getItem('shaheen_tg_channel') || '';
 
     async function _openDriverTelegram() {
-        // إذا الرابط فارغ — نجلبه من app_config فوراً
+        // [FIX-TG-RETRY] إذا الرابط فارغ — نجلبه من app_config مع retry
         if (!_driverTgUrl || _driverTgUrl === '' || _driverTgUrl === '#') {
-            try {
-                const { data: _freshCfg } = await supabaseClient.from('app_config')
-                    .select('driver_telegram_channel').eq('id', 1).single();
-                if (_freshCfg && _freshCfg.driver_telegram_channel) {
-                    _driverTgUrl = _freshCfg.driver_telegram_channel;
-                    localStorage.setItem('shaheen_tg_channel', _driverTgUrl);
-                }
-            } catch(_e) {}
+            siteNotify('⏳ جاري تحميل رابط القناة...');
+            for (let _attempt = 0; _attempt < 3; _attempt++) {
+                try {
+                    const { data: _freshCfg } = await supabaseClient.from('app_config')
+                        .select('driver_telegram_channel').eq('id', 1).single();
+                    if (_freshCfg && _freshCfg.driver_telegram_channel && _freshCfg.driver_telegram_channel !== '') {
+                        _driverTgUrl = _freshCfg.driver_telegram_channel;
+                        localStorage.setItem('shaheen_tg_channel', _driverTgUrl);
+                        break;
+                    }
+                } catch(_e) {}
+                if (_attempt < 2) await new Promise(r => setTimeout(r, 1500));
+            }
         }
         if (!_driverTgUrl || _driverTgUrl === '' || _driverTgUrl === '#') {
-            siteNotify('رابط قناة التليجرام غير متوفر حالياً — تواصل مع الإدارة');
+            siteNotify('⚠️ رابط قناة التليجرام لم يُحدَّد بعد من الإدارة — تواصل معهم على واتساب');
             return;
         }
         try {
@@ -4761,7 +4613,6 @@ ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;');
             window.location.href = _driverTgUrl;
         }
     }
-    // ===== نهاية FIX-TG-3 =====
 
     // ===== FIX-POLL-DRV: Polling احتياطي سريع للطلب النشط =====
     function _startActiveOrderPoll(orderId) {
