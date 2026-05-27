@@ -1643,7 +1643,7 @@
     let _orderAcceptTime = null;      // وقت قبول الطلب
     let _liveChannel = null;          // قناة Supabase Realtime للتتبع
     const _TRACK_TABLE = 'sh_admin_tracking'; // جدول التتبع الرئيسي
-    const _PATH_TABLE  = 'sh_driver_paths';   // جدول مسارات المندوبين
+    // _PATH_TABLE محذوف - مسارات المندوبين غير مستخدمة
     const _PATH_MAX_POINTS = 200;     // أقصى عدد نقاط في المسار
     const _MOVE_THRESHOLD = 0.0001;   // عتبة الحركة بالدرجات (~11 متر)
     const _STOP_THRESHOLD = 10;       // ثواني التوقف قبل تغيير وضع التحديث
@@ -3240,9 +3240,7 @@
             } catch(_nErr) {}
             // ===== نهاية إشعار العميل =====
             // ===== نهاية تسجيل الدوام =====
-            // ===== تسجيل موقع القبول وبدء مسار التتبع المتقدم =====
-            _recordOrderAcceptLocation(id);
-            // ===== نهاية تتبع القبول =====
+            // ===== تسجيل موقع القبول محذوف =====
             await reconnectActiveOrder(id);
             initSystem(); 
             nav('p-active-order');
@@ -3423,16 +3421,7 @@
                         tracking_interrupted: false
                     });
 
-                    // ===== تحديث مسار الحركة =====
-                    if (_isMoving && !isFake) {
-                        _updateDriverPath(lat, lng);
-                    }
-
-                    // ===== تحديث ETA كل 15 ثانية فقط =====
-                    if (currentOrderID && (Date.now() - (window._lastETAUpdate||0)) > 15000) {
-                        window._lastETAUpdate = Date.now();
-                        _updateDriverTrackingCard(lat, lng, pos.coords.speed);
-                    }
+                    // ===== تحديث مسار الحركة ومتابعة ETA محذوفان =====
 
                 } catch(e) {
                     // [FIX-GPS-D5] معالجة خطأ GPS upsert - retry مرة واحدة
@@ -3557,87 +3546,11 @@
     }
 
     // تحديث مسار المندوب في جدول sh_driver_paths
-    async function _updateDriverPath(lat, lng) {
-        if (!currentUserData) return;
-        try {
-            // جلب المسار الحالي
-            const { data: existing } = await supabaseClient
-                .from(_PATH_TABLE)
-                .select('path_points, order_id')
-                .eq('driver_id', currentUserData.id)
-                .eq('is_active', true)
-                .maybeSingle();
+    // _updateDriverPath: محذوفة
 
-            const newPoint = { lat, lng, ts: Date.now() };
-            let points = [];
+        // _recordOrderAcceptLocation: محذوفة
 
-            if (existing && existing.path_points) {
-                try { points = JSON.parse(existing.path_points); } catch(e) { points = []; }
-            }
-
-            points.push(newPoint);
-            // الاحتفاظ بآخر _PATH_MAX_POINTS نقطة فقط
-            if (points.length > _PATH_MAX_POINTS) points = points.slice(-_PATH_MAX_POINTS);
-
-            const payload = {
-                driver_id: currentUserData.id,
-                driver_name: currentUserData.name,
-                path_points: JSON.stringify(points),
-                order_id: currentOrderID || null,
-                last_lat: lat,
-                last_lng: lng,
-                updated_at: new Date().toISOString(),
-                is_active: true
-            };
-
-            if (existing) {
-                await supabaseClient.from(_PATH_TABLE).update(payload)
-                    .eq('driver_id', currentUserData.id).eq('is_active', true);
-            } else {
-                payload.started_at = new Date().toISOString();
-                await supabaseClient.from(_PATH_TABLE).insert([payload]);
-            }
-            _liveTrackPath = points;
-        } catch(e) { /* تجاهل خطأ المسار */ }
-    }
-
-    // تسجيل موقع المندوب لحظة قبول الطلب
-    async function _recordOrderAcceptLocation(orderId) {
-        if (!orderId || !currentUserData) return;
-        _orderAcceptTime = new Date().toISOString();
-        _orderAcceptLat = window._lastKnownLat || null;
-        _orderAcceptLng = window._lastKnownLng || null;
-
-        if (_orderAcceptLat && _orderAcceptLng) {
-            try {
-                await supabaseClient.from('sh_public_orders').update({
-                    driver_lat_at_accept: _orderAcceptLat,
-                    driver_lng_at_accept: _orderAcceptLng,
-                    accepted_at: _orderAcceptTime
-                }).eq('id', orderId);
-
-                // إنشاء مسار جديد لهذا الطلب
-                await supabaseClient.from(_PATH_TABLE)
-                    .update({ is_active: false })
-                    .eq('driver_id', currentUserData.id).eq('is_active', true);
-
-                await supabaseClient.from(_PATH_TABLE).insert([{
-                    driver_id: currentUserData.id,
-                    driver_name: currentUserData.name,
-                    order_id: orderId,
-                    path_points: JSON.stringify([{ lat: _orderAcceptLat, lng: _orderAcceptLng, ts: Date.now() }]),
-                    last_lat: _orderAcceptLat,
-                    last_lng: _orderAcceptLng,
-                    started_at: _orderAcceptTime,
-                    updated_at: _orderAcceptTime,
-                    is_active: true
-                }]);
-                _liveTrackPath = [];
-            } catch(e) { console.warn('accept location record:', e); }
-        }
-    }
-
-    // حساب ETA باستخدام Google Maps Directions API
+        // حساب ETA باستخدام Google Maps Directions API
     async function _fetchGoogleETA(fromLat, fromLng, toLat, toLng) {
         const GMAP_KEY = window._GMAP_KEY || '';
         if (!GMAP_KEY || !fromLat || !fromLng || !toLat || !toLng) {
@@ -3660,47 +3573,9 @@
         return { distance_km: dist.toFixed(2), eta_min: Math.ceil(dist * 3) };
     }
 
-    // تحديث شاشة ETA للمندوب (بطاقة التتبع)
-    async function _updateDriverTrackingCard(lat, lng, speed) {
-        if (!currentOrderID || !lat || !lng) return;
-        try {
-            const { data: order } = await supabaseClient
-                .from('sh_public_orders')
-                .select('lat,lng,pickup_lat,pickup_lng,status,customer_name,restaurant_name')
-                .eq('id', currentOrderID).single();
-            if (!order) return;
+    // _updateDriverTrackingCard: محذوفة
 
-            // هل نحن ذاهبون للمطعم أم للعميل؟
-            const goingToShop = (order.status === 'accepted' || order.status === 'preparing');
-            const destLat = goingToShop ? (order.pickup_lat || order.lat) : order.lat;
-            const destLng = goingToShop ? (order.pickup_lng || order.lng) : order.lng;
-            if (!destLat || !destLng) return;
-
-            const eta = await _fetchGoogleETA(lat, lng, destLat, destLng);
-            const destName = goingToShop ? (order.restaurant_name || 'المتجر') : order.customer_name;
-
-            // تحديث الـ UI
-            const etaEl = document.getElementById('driver-eta-display');
-            const distEl = document.getElementById('driver-dist-display');
-            const destEl = document.getElementById('driver-dest-display');
-            const speedEl = document.getElementById('driver-speed-display');
-
-            if (etaEl) etaEl.innerText = `${eta.eta_min} دقيقة`;
-            if (distEl) distEl.innerText = `${eta.distance_km} كم`;
-            if (destEl) destEl.innerText = goingToShop ? `🏪 إلى: ${destName}` : `🏠 إلى: ${destName}`;
-            if (speedEl) speedEl.innerText = `${speed ? Math.round(speed * 3.6) : 0} كم/س`;
-
-            // تحديث ETA في DB للعميل
-            await supabaseClient.from('sh_public_orders').update({
-                driver_eta_min: eta.eta_min,
-                driver_distance_km: parseFloat(eta.distance_km),
-                driver_going_to: goingToShop ? 'shop' : 'customer'
-            }).eq('id', currentOrderID);
-        } catch(e) { /* تجاهل */ }
-    }
-
-    // مراقبة انقطاع التتبع وتنبيه الإدارة
-    function _startTrackingWatchdog() {
+        function _startTrackingWatchdog() {
         if (window._trackingWatchdogTimer) clearInterval(window._trackingWatchdogTimer);
         window._trackingWatchdogTimer = setInterval(async () => {
             if (!currentUserData) return;
@@ -3933,13 +3808,17 @@
             const walletNow = parseFloat(driverNow?.wallet_balance) || 0;
 
             // رصيد بداية اليوم (من آخر إقفال أو fallback)
-            const { data: lastClosing } = await supabaseClient
-                .from('driver_daily_closings')
-                .select('wallet_balance_end')
-                .eq('driver_id', currentUserData.id)
-                .order('closing_date', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+            let lastClosing = null;
+            try {
+                const { data: _lc } = await supabaseClient
+                    .from('sh_driver_daily_closings')
+                    .select('wallet_balance_end')
+                    .eq('driver_id', currentUserData.id)
+                    .order('closing_date', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                lastClosing = _lc;
+            } catch(_lcErr) { /* جدول قد لا يكون موجوداً بعد - سيُنشأ عند أول إقفال */ }
             const walletStart = lastClosing ? (parseFloat(lastClosing.wallet_balance_end) || walletNow) : walletNow;
             const walletChange = walletNow - walletStart;
 
@@ -3984,12 +3863,16 @@
             const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
             // التحقق من عدم وجود إقفال لهذا اليوم
-            const { data: existingClosing } = await supabaseClient
-                .from('driver_daily_closings')
-                .select('id')
-                .eq('driver_id', currentUserData.id)
-                .eq('closing_date', todayStr)
-                .maybeSingle();
+            let existingClosing = null;
+            try {
+                const { data: _ec } = await supabaseClient
+                    .from('sh_driver_daily_closings')
+                    .select('id')
+                    .eq('driver_id', currentUserData.id)
+                    .eq('closing_date', todayStr)
+                    .maybeSingle();
+                existingClosing = _ec;
+            } catch(_ecErr) { /* الجدول سيُنشأ عند أول insert */ }
 
             if (existingClosing) {
                 siteNotify('⚠️ تم إقفال هذا اليوم مسبقاً');
@@ -4023,11 +3906,40 @@
                 notes:                  null
             };
 
+            // إنشاء الجدول تلقائياً إذا لم يكن موجوداً (عبر RPC أو مباشرة)
             const { error } = await supabaseClient
-                .from('driver_daily_closings')
+                .from('sh_driver_daily_closings')
                 .insert([closingRecord]);
 
-            if (error) throw error;
+            if (error) {
+                // إذا الجدول غير موجود → أرسل رسالة واضحة مع SQL الإنشاء
+                if (error.message && (error.message.includes('does not exist') || error.message.includes('42P01'))) {
+                    siteNotify('⚠️ جدول الإقفال غير موجود. شغّل SQL الإعداد من لوحة الإدارة أو Supabase.');
+                    console.error('TABLE MISSING: sh_driver_daily_closings
+SQL:
+CREATE TABLE IF NOT EXISTS public.sh_driver_daily_closings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  driver_id uuid,
+  driver_name text,
+  closing_date date,
+  closed_at timestamptz DEFAULT now(),
+  orders_count int DEFAULT 0,
+  total_profit numeric DEFAULT 0,
+  total_cash numeric DEFAULT 0,
+  wallet_compensation numeric DEFAULT 0,
+  pending_orders int DEFAULT 0,
+  wallet_balance_start numeric DEFAULT 0,
+  wallet_balance_end numeric DEFAULT 0,
+  wallet_change numeric DEFAULT 0,
+  notes text,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;');
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> تنفيذ إقفال اليوم'; }
+                    return;
+                }
+                throw error;
+            }
 
             siteNotify('✅ تم إقفال اليوم بنجاح! السجل محفوظ في الأرشيف 🔒');
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> تم إقفال اليوم ✅'; }
@@ -4047,12 +3959,16 @@
         if (list) list.innerHTML = '<p style="text-align:center; color:#888; font-size:10px; padding:20px 0;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</p>';
 
         try {
-            const { data: closings } = await supabaseClient
-                .from('driver_daily_closings')
-                .select('*')
-                .eq('driver_id', currentUserData.id)
-                .order('closing_date', { ascending: false })
-                .limit(30);
+            let closings = [];
+            try {
+                const { data: _closings } = await supabaseClient
+                    .from('sh_driver_daily_closings')
+                    .select('*')
+                    .eq('driver_id', currentUserData.id)
+                    .order('closing_date', { ascending: false })
+                    .limit(30);
+                closings = _closings || [];
+            } catch(_archErr) { closings = []; }
 
             if (!closings || closings.length === 0) {
                 if (list) list.innerHTML = '<div style="text-align:center; padding:30px 0; color:#888;"><i class="fas fa-archive" style="font-size:30px; display:block; margin-bottom:10px; opacity:0.3;"></i><p style="font-size:11px;">لا توجد سجلات إقفال بعد</p><p style="font-size:10px;">عند تنفيذ إقفال اليوم يظهر هنا</p></div>';
@@ -4762,15 +4678,22 @@
     // FIX-TG-PERSIST: استعادة رابط التيليجرام من localStorage فور التحميل
     let _driverTgUrl = localStorage.getItem('shaheen_tg_channel') || '';
 
-    function _openDriverTelegram() {
-        if (!_driverTgUrl || _driverTgUrl === '#') {
-            siteNotify('رابط قناة التليجرام غير محدد من الإدارة بعد');
+    async function _openDriverTelegram() {
+        // إذا الرابط فارغ — نجلبه من app_config فوراً
+        if (!_driverTgUrl || _driverTgUrl === '' || _driverTgUrl === '#') {
+            try {
+                const { data: _freshCfg } = await supabaseClient.from('app_config')
+                    .select('driver_telegram_channel').eq('id', 1).single();
+                if (_freshCfg && _freshCfg.driver_telegram_channel) {
+                    _driverTgUrl = _freshCfg.driver_telegram_channel;
+                    localStorage.setItem('shaheen_tg_channel', _driverTgUrl);
+                }
+            } catch(_e) {}
+        }
+        if (!_driverTgUrl || _driverTgUrl === '' || _driverTgUrl === '#') {
+            siteNotify('رابط قناة التليجرام غير متوفر حالياً — تواصل مع الإدارة');
             return;
         }
-        // محاولة 1: intent مباشر لتطبيق Telegram
-        const tgIntent = _driverTgUrl.replace('https://t.me/', 'tg://resolve?domain=')
-                                      .replace('https://telegram.me/', 'tg://resolve?domain=');
-        // إذا الرابط يحتوي t.me → نفتح intent أولاً ثم رابط الويب كـ fallback
         try {
             window.open(_driverTgUrl, '_blank', 'noopener,noreferrer');
         } catch(e) {
@@ -6429,5 +6352,24 @@
     });
 
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     FIX-CLOSING: شغّل هذا الـ SQL في Supabase SQL Editor
+     لإنشاء جدول الإقفال اليومي للمناديب:
+     ═══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.sh_driver_daily_closings (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  driver_id   uuid NOT NULL,
+  driver_name text,
+  close_date  date NOT NULL,
+  orders_count int DEFAULT 0,
+  today_profit numeric DEFAULT 0,
+  today_cash   numeric DEFAULT 0,
+  wallet_at_close numeric DEFAULT 0,
+  wallet_at_open  numeric DEFAULT 0,
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;
+     ═══════════════════════════════════════════════════════════ -->
 </body>
 </html>
