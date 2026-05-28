@@ -1903,7 +1903,7 @@
     }
 
     // ════ دالة دخول مشتركة ════
-    function _loginWithDriver(driver, btn) {
+    async function _loginWithDriver(driver, btn) {
         if (!driver) { siteNotify('بيانات غير صحيحة'); btn.disabled=false; btn.innerText='دخول النظام'; return; }
         if (driver.status === 'suspended' || driver.status === 'locked') {
             document.getElementById('suspend-msg').innerText = 'حسابك موقف حالياً، راجع الإدارة';
