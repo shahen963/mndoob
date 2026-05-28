@@ -428,7 +428,7 @@
                 🔑 كود التفعيل
             </button>
             <button id="tab-phone" onclick="_switchLoginTab('phone')"
-                style="flex:1; padding:7px; border:none; border-radius:8px; font-size:11px; cursor:pointer; background:transparent; color:#888;">
+                style="display:none; flex:1; padding:7px; border:none; border-radius:8px; font-size:11px; cursor:pointer; background:transparent; color:#888;">
                 📱 رقم الجوال
             </button>
         </div>
@@ -444,6 +444,15 @@
             <input type="tel" id="auth-phone" class="auth-input" placeholder="رقم الجوال * (مثال: 0933xxxxxxx)"
                    oninput="this.value=this.value.replace(/[^0-9+]/g,'')">
             <p style="font-size:9px; color:#888; margin:-6px 0 6px;">يجب أن يكون الجوال مسجلاً من قِبل الإدارة</p>
+        </div>
+
+        <!-- خيار تذكرني -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:8px; background:rgba(255,255,255,0.04); border-radius:10px; border:1px solid rgba(212,175,55,0.15);">
+            <label class="switch" style="flex-shrink:0;">
+                <input type="checkbox" id="remember-me-checkbox">
+                <span class="slider"></span>
+            </label>
+            <label for="remember-me-checkbox" style="font-size:11px; color:var(--gold); cursor:pointer;">تذكرني — ابقَ مسجلاً تلقائياً 🦅</label>
         </div>
 
         <button class="btn-gold" id="login-btn" onclick="login()" style="width:100%;">دخول النظام</button>
@@ -1891,8 +1900,23 @@
             btn.disabled = false; btn.innerText = 'دخول النظام';
             return;
         }
+        // [ONE-SESSION] منع تسجيل الدخول إذا كان هناك حساب مسجل دخول على نفس الجهاز
+        const _existingSession = localStorage.getItem('shaheen_driver');
+        if (_existingSession) {
+            try {
+                const _existingDriver = JSON.parse(_existingSession);
+                if (_existingDriver && _existingDriver.id && _existingDriver.id !== driver.id) {
+                    siteNotify('⚠️ هناك حساب مسجل دخول على هذا الجهاز. يرجى تسجيل الخروج أولاً.');
+                    btn.disabled = false; btn.innerText = 'دخول النظام';
+                    return;
+                }
+            } catch(e) { /* تجاهل خطأ التحليل */ }
+        }
         currentUserData = { ...driver, id: driver.id };
+        // [REMEMBER-ME] حفظ البيانات حسب خيار "تذكرني"
+        const _rememberMeChecked = document.getElementById('remember-me-checkbox') && document.getElementById('remember-me-checkbox').checked;
         localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
+        localStorage.setItem('shaheen_driver_remember', _rememberMeChecked ? '1' : '0');
         siteNotify('تم تسجيل الدخول بنجاح! 🦅');
         // GPS في الخلفية
         setTimeout(() => {
@@ -1908,6 +1932,15 @@
     }
 
     async function initSystem() {
+        // [REMEMBER-ME] إذا لم يكن "تذكرني" مفعلاً وتم إعادة تشغيل التطبيق (session جديدة)، نحذف البيانات المحفوظة
+        if (!window._sessionStarted) {
+            window._sessionStarted = true;
+            const _rememberFlag = localStorage.getItem('shaheen_driver_remember');
+            if (_rememberFlag === '0') {
+                localStorage.removeItem('shaheen_driver');
+                localStorage.removeItem('shaheen_driver_remember');
+            }
+        }
         const saved = localStorage.getItem('shaheen_driver');
         if(saved) {
             currentUserData = JSON.parse(saved);
@@ -4005,6 +4038,7 @@
             _refreshOrdersLock = false; _acceptOrderPending = false; _finishOrderPending = false;
             await supabaseClient.auth.signOut();
             localStorage.removeItem('shaheen_driver');
+            localStorage.removeItem('shaheen_driver_remember');
             localStorage.removeItem('shaheen_work_status');
             location.reload();
         }
