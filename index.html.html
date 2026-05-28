@@ -477,6 +477,24 @@
     </div>
     <!-- ===== نهاية مودال اختيار حجم الشاشة ===== -->
 
+    <!-- ===== مودال تأكيد تسجيل الخروج — بديل confirm() لجميع الأجهزة ===== -->
+    <div id="logout-confirm-modal" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:50000; display:none; flex-direction:column; justify-content:center; align-items:center; padding:24px; text-align:center; border-radius:inherit; backdrop-filter:blur(8px);">
+        <div style="background:var(--glass); border:2px solid rgba(231,76,60,0.5); border-radius:20px; padding:24px; width:100%;">
+            <i class="fas fa-sign-out-alt" style="font-size:36px; color:#e74c3c; margin-bottom:12px; display:block;"></i>
+            <h3 style="color:#fff; font-size:15px; margin:0 0 8px;">تسجيل الخروج</h3>
+            <p style="color:#aaa; font-size:11px; line-height:1.6; margin:0 0 20px;">هل تريد تسجيل الخروج يا صقر؟<br>لن يضيع طلبك المستلم 🦅</p>
+            <div style="display:flex; gap:10px;">
+                <button onclick="_cancelLogout()" style="flex:1; background:rgba(255,255,255,0.05); border:1px solid #555; color:#aaa; padding:12px; border-radius:10px; font-size:12px; cursor:pointer;">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+                <button onclick="_doLogout()" style="flex:1; background:rgba(231,76,60,0.2); border:1px solid #e74c3c; color:#e74c3c; padding:12px; border-radius:10px; font-size:12px; font-weight:bold; cursor:pointer;">
+                    <i class="fas fa-sign-out-alt"></i> خروج
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- ===== نهاية مودال تأكيد تسجيل الخروج ===== -->
+
         <div id="p-auth" class="page active" style="justify-content: center; align-items: center; text-align: center;">
         <img src="https://i.postimg.cc/QxzPkmPf/Whats-App-Image-2026-04-10-at-6-22-30-PM-t7edrz.jpg" style="width:80px; margin-bottom:12px; border-radius:50%; border:2px solid var(--gold);">
         <h2 style="color:var(--gold); font-size: 16px;">دخول الصقور 🦅</h2>
@@ -1805,7 +1823,13 @@
         } else {
             setAppScale(scale);
         }
+        // [FIX-SCALE-PER-USER] ربط اختيار الحجم بالجهاز — مفتاح واحد للجهاز
         localStorage.setItem('shaheen_screen_size_chosen', '1');
+        // حفظ نسخة احتياطية بـ ID المستخدم إذا كان مسجلاً
+        if (currentUserData && currentUserData.id) {
+            const _scaleVal = scale !== null && scale !== undefined ? scale : 'auto';
+            localStorage.setItem('shaheen_scale_' + currentUserData.id, String(_scaleVal));
+        }
         const modal = document.getElementById('screen-size-modal');
         if (modal) modal.style.display = 'none';
     }
@@ -4210,35 +4234,50 @@
 
     // ===== نهاية نظام الإقفال اليومي =====
     
-    async function logout() {
-        if(confirm("هل تريد تسجيل الخروج يا صقر؟ لن يضيع طلبك المستلم 🦅")) {
-            // [FIX-D5] تنظيف شامل قبل الخروج
-            if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
-            if (window._trackingPeriodicTimer)  { clearInterval(window._trackingPeriodicTimer); window._trackingPeriodicTimer = null; }
-            if (window._trackingKeepAliveTimer) { clearInterval(window._trackingKeepAliveTimer); window._trackingKeepAliveTimer = null; }
-            if (window._trackingWatchdogTimer)  { clearInterval(window._trackingWatchdogTimer); window._trackingWatchdogTimer = null; }
-            if (window._trackingFallbackTimer)  { clearInterval(window._trackingFallbackTimer); window._trackingFallbackTimer = null; }
-            if (window._distanceUpdateTimer)    { clearInterval(window._distanceUpdateTimer); window._distanceUpdateTimer = null; }
-            if (window._trackingCardUpdateTimer){ clearInterval(window._trackingCardUpdateTimer); window._trackingCardUpdateTimer = null; }
-            if (window._orderElapsedTimer)      { clearInterval(window._orderElapsedTimer); window._orderElapsedTimer = null; }
-            if (window._statusCheckInterval)    { clearInterval(window._statusCheckInterval); window._statusCheckInterval = null; }
-            if (window._shiftTimer)             { clearInterval(window._shiftTimer); window._shiftTimer = null; }
-            if (window._shiftHeartbeat)         { clearInterval(window._shiftHeartbeat); window._shiftHeartbeat = null; }
-            if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
-            _refreshOrdersLock = false; _acceptOrderPending = false; _finishOrderPending = false;
-            await supabaseClient.auth.signOut();
-            // [MULTI-DEVICE-UNLOCK] مسح معرف الجهاز من قاعدة البيانات عند تسجيل الخروج لإتاحة الدخول من جهاز آخر
-            if (currentUserData && currentUserData.id) {
-                await supabaseClient.from('drivers').update({ active_device_id: null }).eq('id', currentUserData.id).catch(()=>{});
-            }
-            // [END-MULTI-DEVICE-UNLOCK]
-            localStorage.removeItem('shaheen_driver');
-            localStorage.removeItem('shaheen_driver_remember');
-            localStorage.removeItem('shaheen_work_status');
-            // [FIX-LOGOUT] الحفاظ على تفضيل حجم الشاشة بعد تسجيل الخروج
-            // app_scale و shaheen_screen_size_chosen تبقى محفوظة حتى لا يُسأل مجدداً
-            location.reload();
+    function logout() {
+        // [FIX-LOGOUT-MODAL] استبدال confirm() بمودال مخصص يعمل على جميع الأجهزة والمتصفحات
+        const _logoutModal = document.getElementById('logout-confirm-modal');
+        if (_logoutModal) _logoutModal.style.display = 'flex';
+    }
+
+    async function _doLogout() {
+        const _logoutModal = document.getElementById('logout-confirm-modal');
+        if (_logoutModal) _logoutModal.style.display = 'none';
+        // [FIX-D5] تنظيف شامل قبل الخروج
+        if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+        if (window._trackingPeriodicTimer)  { clearInterval(window._trackingPeriodicTimer); window._trackingPeriodicTimer = null; }
+        if (window._trackingKeepAliveTimer) { clearInterval(window._trackingKeepAliveTimer); window._trackingKeepAliveTimer = null; }
+        if (window._trackingWatchdogTimer)  { clearInterval(window._trackingWatchdogTimer); window._trackingWatchdogTimer = null; }
+        if (window._trackingFallbackTimer)  { clearInterval(window._trackingFallbackTimer); window._trackingFallbackTimer = null; }
+        if (window._distanceUpdateTimer)    { clearInterval(window._distanceUpdateTimer); window._distanceUpdateTimer = null; }
+        if (window._trackingCardUpdateTimer){ clearInterval(window._trackingCardUpdateTimer); window._trackingCardUpdateTimer = null; }
+        if (window._orderElapsedTimer)      { clearInterval(window._orderElapsedTimer); window._orderElapsedTimer = null; }
+        if (window._statusCheckInterval)    { clearInterval(window._statusCheckInterval); window._statusCheckInterval = null; }
+        if (window._shiftTimer)             { clearInterval(window._shiftTimer); window._shiftTimer = null; }
+        if (window._shiftHeartbeat)         { clearInterval(window._shiftHeartbeat); window._shiftHeartbeat = null; }
+        if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
+        _refreshOrdersLock = false; _acceptOrderPending = false; _finishOrderPending = false;
+        try { await supabaseClient.auth.signOut(); } catch(e) {}
+        // [MULTI-DEVICE-UNLOCK] مسح معرف الجهاز من قاعدة البيانات عند تسجيل الخروج لإتاحة الدخول من جهاز آخر
+        if (currentUserData && currentUserData.id) {
+            await supabaseClient.from('drivers').update({ active_device_id: null }).eq('id', currentUserData.id).catch(()=>{});
         }
+        // [END-MULTI-DEVICE-UNLOCK]
+        // [FIX-LOGOUT-SCALE] حفظ تفضيل حجم الشاشة الخاص بهذا المستخدم قبل مسح بياناته
+        const _logoutUserId = currentUserData && currentUserData.id ? currentUserData.id : 'default';
+        const _savedScale = localStorage.getItem('app_scale');
+        if (_savedScale) localStorage.setItem('shaheen_scale_' + _logoutUserId, _savedScale);
+        localStorage.removeItem('shaheen_driver');
+        localStorage.removeItem('shaheen_driver_remember');
+        localStorage.removeItem('shaheen_work_status');
+        // app_scale و shaheen_screen_size_chosen تبقى محفوظة على الجهاز
+        currentUserData = null;
+        location.reload();
+    }
+
+    function _cancelLogout() {
+        const _logoutModal = document.getElementById('logout-confirm-modal');
+        if (_logoutModal) _logoutModal.style.display = 'none';
     }
 
     async function openConfirmModal() {
