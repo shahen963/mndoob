@@ -55,6 +55,18 @@
 
         #suspend-modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--purple); z-index: 30000; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; border-radius: inherit; }
 
+        /* ===== مودال اختيار حجم الشاشة ===== */
+        #screen-size-modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 0, 15, 0.97); z-index: 40000; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; border-radius: inherit; backdrop-filter: blur(10px); }
+        .screen-size-option { display: flex; align-items: center; justify-content: space-between; background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; width: 100%; cursor: pointer; transition: 0.3s; }
+        .screen-size-option:active { background: rgba(212, 175, 55, 0.2); transform: scale(0.98); }
+        .screen-size-option.selected { background: rgba(212, 175, 55, 0.15); border-color: var(--gold); box-shadow: 0 0 12px rgba(212, 175, 55, 0.3); }
+        .screen-size-icon { font-size: 22px; margin-left: 10px; }
+        .screen-size-info { flex: 1; text-align: right; }
+        .screen-size-title { font-size: 13px; font-weight: bold; color: #fff; display: block; }
+        .screen-size-desc { font-size: 9px; color: #aaa; display: block; margin-top: 2px; }
+        .screen-size-check { width: 20px; height: 20px; border: 2px solid var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .screen-size-option.selected .screen-size-check::after { content: ''; width: 10px; height: 10px; background: var(--gold); border-radius: 50%; display: block; }
+
         .tab-bar { height: 60px; background: #000; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--gold); position: absolute; bottom: 0; width: 100%; padding-bottom: 6px; z-index: 100; }
         .page.active { padding-bottom: 90px !important; }
         .tab-item { color: #555; text-align: center; font-size: 7px; cursor: pointer; flex: 1; position: relative; }
@@ -417,7 +429,55 @@
         <button class="btn-gold" style="background:transparent; color:#888; border:1px solid #555; font-size:10px;" onclick="checkBalanceAndClose()"><i class="fas fa-sync"></i> فحص الرصيد من جديد</button>
     </div>
 
-    <div id="p-auth" class="page active" style="justify-content: center; align-items: center; text-align: center;">
+    <!-- ===== مودال اختيار حجم الشاشة — يظهر مرة واحدة بعد أول تسجيل دخول ===== -->
+    <div id="screen-size-modal">
+        <img src="https://i.postimg.cc/QxzPkmPf/Whats-App-Image-2026-04-10-at-6-22-30-PM-t7edrz.jpg" style="width:60px; border-radius:50%; border:2px solid var(--gold); margin-bottom:14px;">
+        <h2 style="color:var(--gold); font-size:16px; margin-bottom:4px;">اختر حجم الواجهة 📱</h2>
+        <p style="font-size:10px; color:#aaa; margin-bottom:18px; line-height:1.5;">اختر الحجم المناسب لشاشتك<br>يمكنك تغييره لاحقاً من الإعدادات</p>
+
+        <div class="screen-size-option" id="sso-auto" onclick="_selectScreenSize('auto')">
+            <div class="screen-size-check"></div>
+            <div class="screen-size-info">
+                <span class="screen-size-title">ملء الشاشة تلقائي</span>
+                <span class="screen-size-desc">الأفضل لمعظم الأجهزة — يتكيف مع شاشتك</span>
+            </div>
+            <span class="screen-size-icon">🔲</span>
+        </div>
+
+        <div class="screen-size-option" id="sso-small" onclick="_selectScreenSize('small')">
+            <div class="screen-size-check"></div>
+            <div class="screen-size-info">
+                <span class="screen-size-title">صغير — 70%</span>
+                <span class="screen-size-desc">للشاشات الكبيرة أو من يفضل الحجم المصغّر</span>
+            </div>
+            <span class="screen-size-icon">📱</span>
+        </div>
+
+        <div class="screen-size-option" id="sso-medium" onclick="_selectScreenSize('medium')">
+            <div class="screen-size-check"></div>
+            <div class="screen-size-info">
+                <span class="screen-size-title">متوسط — 85%</span>
+                <span class="screen-size-desc">مناسب للشاشات المتوسطة</span>
+            </div>
+            <span class="screen-size-icon">🖥️</span>
+        </div>
+
+        <div class="screen-size-option" id="sso-large" onclick="_selectScreenSize('large')">
+            <div class="screen-size-check"></div>
+            <div class="screen-size-info">
+                <span class="screen-size-title">كبير — 100%</span>
+                <span class="screen-size-desc">الحجم الكامل — للشاشات الصغيرة</span>
+            </div>
+            <span class="screen-size-icon">📺</span>
+        </div>
+
+        <button class="btn-gold" style="margin-top:14px; height:44px; font-size:13px;" onclick="_confirmScreenSize()">
+            <i class="fas fa-check"></i> تأكيد الاختيار والدخول 🦅
+        </button>
+    </div>
+    <!-- ===== نهاية مودال اختيار حجم الشاشة ===== -->
+
+        <div id="p-auth" class="page active" style="justify-content: center; align-items: center; text-align: center;">
         <img src="https://i.postimg.cc/QxzPkmPf/Whats-App-Image-2026-04-10-at-6-22-30-PM-t7edrz.jpg" style="width:80px; margin-bottom:12px; border-radius:50%; border:2px solid var(--gold);">
         <h2 style="color:var(--gold); font-size: 16px;">دخول الصقور 🦅</h2>
 
@@ -1712,6 +1772,43 @@
     });
     // ===== نهاية دوال حجم الشاشة =====
 
+    // ===== مودال اختيار حجم الشاشة — يظهر مرة واحدة بعد أول تسجيل دخول =====
+    let _selectedScreenSize = 'auto';
+
+    function _showScreenSizeModal() {
+        // يظهر فقط إذا لم يختر المستخدم مسبقاً
+        const alreadyChosen = localStorage.getItem('shaheen_screen_size_chosen');
+        if (alreadyChosen) return;
+        _selectedScreenSize = 'auto';
+        document.querySelectorAll('.screen-size-option').forEach(el => el.classList.remove('selected'));
+        const autoEl = document.getElementById('sso-auto');
+        if (autoEl) autoEl.classList.add('selected');
+        const modal = document.getElementById('screen-size-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function _selectScreenSize(size) {
+        _selectedScreenSize = size;
+        document.querySelectorAll('.screen-size-option').forEach(el => el.classList.remove('selected'));
+        const el = document.getElementById('sso-' + size);
+        if (el) el.classList.add('selected');
+    }
+
+    function _confirmScreenSize() {
+        const scaleMap = { auto: null, small: 0.70, medium: 0.85, large: 1.0 };
+        const scale = scaleMap[_selectedScreenSize];
+        if (scale === null || scale === undefined) {
+            setAppScaleAuto();
+            localStorage.removeItem('app_scale');
+        } else {
+            setAppScale(scale);
+        }
+        localStorage.setItem('shaheen_screen_size_chosen', '1');
+        const modal = document.getElementById('screen-size-modal');
+        if (modal) modal.style.display = 'none';
+    }
+    // ===== نهاية مودال اختيار حجم الشاشة =====
+
     function siteNotify(msg) {
         const n = document.getElementById('site-notify');
         n.innerText = msg;
@@ -1974,6 +2071,8 @@
         supabaseClient.from('drivers').update({ active_device_id: _currentDeviceId }).eq('id', driver.id).then(()=>{}).catch(()=>{});
         // [END-MULTI-DEVICE-LOCK]
         siteNotify('تم تسجيل الدخول بنجاح! 🦅');
+        // عرض مودال اختيار حجم الشاشة مرة واحدة عند أول تسجيل دخول
+        setTimeout(() => _showScreenSizeModal(), 800);
         // GPS في الخلفية
         setTimeout(() => {
             if (navigator.geolocation) {
@@ -6412,6 +6511,41 @@
     });
 
 </script>
+
+<!-- ===== Firebase Cloud Messaging — إشعارات الدفع للمندوب ===== -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js";
+  import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyAS2dSLHBkOgazBtHGTH4QVHV_-yk2m_Ec",
+    authDomain: "shaheeeen-5e984.firebaseapp.com",
+    projectId: "shaheeeen-5e984",
+    storageBucket: "shaheeeen-5e984.firebasestorage.app",
+    messagingSenderId: "1037170142697",
+    appId: "1:1037170142697:web:9ae5212433e3e6e755ef78"
+  };
+  const app = initializeApp(firebaseConfig);
+  const messaging = getMessaging(app);
+  // تسجيل الـ Service Worker وطلب الإذن
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+    .then((registration) => {
+      console.log('SW Registered');
+      
+      // طلب الإذن للحصول على التوكن
+      return getToken(messaging, { serviceWorkerRegistration: registration });
+    })
+    .then((currentToken) => {
+      if (currentToken) {
+        console.log('Token جاهز للإرسال للسيرفر:', currentToken);
+        // هنا يجب أن ترسل هذا التوكن لقاعدة بياناتك لربطه بملف المستخدم أو السائق
+      }
+    }).catch((err) => {
+      console.log('حدث خطأ:', err);
+    });
+  }
+</script>
+<!-- ===== نهاية Firebase Cloud Messaging ===== -->
 
 <!-- ═══════════════════════════════════════════════════════════
      FIX-CLOSING: شغّل هذا الـ SQL في Supabase SQL Editor
