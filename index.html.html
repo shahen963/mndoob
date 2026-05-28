@@ -1588,6 +1588,17 @@
        ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS company_running_balance numeric DEFAULT 0;
        ============================================================ */
     const supabaseKey = 'sb_publishable_k6LgEuwPLdCsBMCFC12wfQ_BSOJotuw';
+    // [SEC-DEVICE] دالة توليد معرف الجهاز الفريد — لمنع تسجيل الدخول من أكثر من جهاز
+    // SQL مطلوب مرة واحدة: ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS active_device_id text DEFAULT NULL;
+    function _getDeviceId() {
+        let _did = localStorage.getItem('shaheen_device_id');
+        if (!_did) {
+            _did = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 11);
+            localStorage.setItem('shaheen_device_id', _did);
+        }
+        return _did;
+    }
+    const _currentDeviceId = _getDeviceId();
     // [SEC-FIX-D7] Brute Force Protection للمندوبين
     let _driverLoginAttempts = 0, _driverLockUntil = 0;
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey, {
@@ -1900,23 +1911,60 @@
             btn.disabled = false; btn.innerText = 'دخول النظام';
             return;
         }
-        // [ONE-SESSION] منع تسجيل الدخول إذا كان هناك حساب مسجل دخول على نفس الجهاز
+        // [ONE-SESSION] منع تسجيل الدخول إذا كان هناك أي حساب مسجل دخول على نفس الجهاز
         const _existingSession = localStorage.getItem('shaheen_driver');
         if (_existingSession) {
             try {
                 const _existingDriver = JSON.parse(_existingSession);
                 if (_existingDriver && _existingDriver.id && _existingDriver.id !== driver.id) {
-                    siteNotify('⚠️ هناك حساب مسجل دخول على هذا الجهاز. يرجى تسجيل الخروج أولاً.');
+                    // حساب مختلف مسجل — منع الدخول تماماً
+                    const _existingName = _existingDriver.name || 'مندوب آخر';
+                    siteNotify('⛔ الجهاز مرتبط بحساب: ' + _existingName + ' — يجب تسجيل الخروج أولاً');
                     btn.disabled = false; btn.innerText = 'دخول النظام';
+                    // إظهار زر تسجيل الخروج المؤقت إذا لم يكن ظاهراً
+                    let _forceLogoutBtn = document.getElementById('force-logout-btn');
+                    if (!_forceLogoutBtn) {
+                        _forceLogoutBtn = document.createElement('button');
+                        _forceLogoutBtn.id = 'force-logout-btn';
+                        _forceLogoutBtn.className = 'btn-gold';
+                        _forceLogoutBtn.style.cssText = 'background:rgba(231,76,60,0.2); color:#e74c3c; border:1px solid #e74c3c; margin-top:8px; font-size:10px;';
+                        _forceLogoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> تسجيل خروج الحساب الحالي (' + _existingName + ')';
+                        _forceLogoutBtn.onclick = function() {
+                            localStorage.removeItem('shaheen_driver');
+                            localStorage.removeItem('shaheen_driver_remember');
+                            localStorage.removeItem('shaheen_work_status');
+                            _forceLogoutBtn.remove();
+                            siteNotify('✅ تم تسجيل الخروج — أعد المحاولة الآن');
+                        };
+                        const _loginErr = document.getElementById('login-error-detail');
+                        if (_loginErr && _loginErr.parentNode) {
+                            _loginErr.parentNode.insertBefore(_forceLogoutBtn, _loginErr.nextSibling);
+                        }
+                    }
                     return;
                 }
             } catch(e) { /* تجاهل خطأ التحليل */ }
         }
+        // [MULTI-DEVICE-BLOCK] منع تسجيل الدخول لنفس الحساب من جهاز مختلف منعاً باتاً
+        try {
+            const { data: _freshDrvRecord } = await supabaseClient.from('drivers')
+                .select('active_device_id').eq('id', driver.id).single();
+            if (_freshDrvRecord && _freshDrvRecord.active_device_id &&
+                _freshDrvRecord.active_device_id !== _currentDeviceId) {
+                siteNotify('⛔ هذا الحساب مسجّل دخول على جهاز آخر — يجب تسجيل الخروج من الجهاز الأول أولاً');
+                btn.disabled = false; btn.innerText = 'دخول النظام';
+                return;
+            }
+        } catch (_mdCheckErr) { /* تجاهل خطأ الفحص والمتابعة */ }
+        // [END-MULTI-DEVICE-BLOCK]
         currentUserData = { ...driver, id: driver.id };
         // [REMEMBER-ME] حفظ البيانات حسب خيار "تذكرني"
         const _rememberMeChecked = document.getElementById('remember-me-checkbox') && document.getElementById('remember-me-checkbox').checked;
         localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
         localStorage.setItem('shaheen_driver_remember', _rememberMeChecked ? '1' : '0');
+        // [MULTI-DEVICE-LOCK] تسجيل معرف الجهاز في قاعدة البيانات لربط الحساب بهذا الجهاز
+        supabaseClient.from('drivers').update({ active_device_id: _currentDeviceId }).eq('id', driver.id).then(()=>{}).catch(()=>{});
+        // [END-MULTI-DEVICE-LOCK]
         siteNotify('تم تسجيل الدخول بنجاح! 🦅');
         // GPS في الخلفية
         setTimeout(() => {
@@ -1944,6 +1992,23 @@
         const saved = localStorage.getItem('shaheen_driver');
         if(saved) {
             currentUserData = JSON.parse(saved);
+            // [MULTI-DEVICE-SESSION-CHECK] تحقق فوري أن معرف الجهاز المخزن في DB يطابق الجهاز الحالي
+            // إذا سُرقت البيانات من localStorage ونُقلت لجهاز آخر، يتم الطرد فوراً
+            setTimeout(async () => {
+                try {
+                    const { data: _sessionCheck } = await supabaseClient.from('drivers')
+                        .select('active_device_id, status').eq('id', currentUserData.id).single();
+                    if (_sessionCheck && _sessionCheck.active_device_id &&
+                        _sessionCheck.active_device_id !== _currentDeviceId) {
+                        localStorage.removeItem('shaheen_driver');
+                        localStorage.removeItem('shaheen_driver_remember');
+                        localStorage.removeItem('shaheen_work_status');
+                        document.getElementById('suspend-msg').innerText = '⛔ هذه الجلسة غير صالحة على هذا الجهاز — سجّل دخولك مجدداً';
+                        document.getElementById('suspend-modal').style.display = 'flex';
+                    }
+                } catch(_scErr) { /* تجاهل خطأ الفحص */ }
+            }, 3000);
+            // [END-MULTI-DEVICE-SESSION-CHECK]
             // FIX-LOGIN: تأجير التتبع لمنع تعليق صفحة الدخول
             setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 1500);
 
@@ -2794,7 +2859,7 @@
         hList.innerHTML = "";
         if(data) {
             data.reverse().forEach(o => {
-                hList.innerHTML += `<div class="history-item">#${o.id} | ${o.restaurant_name || o.res || o.res_name} - ${o.total} ل.س</div>`;
+                hList.innerHTML += `<div class="history-item">#${o.id} | ${escHtml(o.restaurant_name || o.res || o.res_name)} - ${o.total} ل.س</div>`;
             });
         }
     }
@@ -3047,9 +3112,9 @@
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:3px;">
                             <div>
                                 <small style="display:block; color:${typeColor}; font-weight:bold; font-size:8px; margin-bottom:1px;">#${o.id} | <span id="dist-${o.id}">${distanceText}</span></small>
-                                <b style="color:${typeColor}; font-size:11px;">${typeIcon} ${typeLabel}: ${o.restaurant_name || o.res || o.res_name || 'طلب شاهين'}</b>
-                                <small style="display:block; color:#eee; font-size:8px; margin-top:1px;">📍 من: ${o.res_address || 'المتجر'}</small>
-                                <small style="display:block; color:#eee; font-size:8px; margin-top:1px;">🏠 إلى: ${o.customer_address || 'العميل'}</small>
+                                <b style="color:${typeColor}; font-size:11px;">${typeIcon} ${typeLabel}: ${escHtml(o.restaurant_name || o.res || o.res_name || 'طلب شاهين')}</b>
+                                <small style="display:block; color:#eee; font-size:8px; margin-top:1px;">📍 من: ${escHtml(o.res_address || 'المتجر')}</small>
+                                <small style="display:block; color:#eee; font-size:8px; margin-top:1px;">🏠 إلى: ${escHtml(o.customer_address || 'العميل')}</small>
                             </div>
                             <div style="text-align:left;">
                                 <b style="color:#fff; display:block; font-size:10px;">${o.total.toLocaleString()} ل.س</b>
@@ -3057,7 +3122,7 @@
                             </div>
                         </div>
                         ${(parseFloat(o.discount) > 0) ? '<div style="background:rgba(231,76,60,0.15);border:1px solid #e74c3c;border-radius:6px;padding:5px 8px;margin-bottom:5px;text-align:center;font-weight:bold;color:#e74c3c;font-size:10px;">⚠️ تم استخدام كود خصم على هذا الطلب</div>' : ''}
-                        <button class="btn-gold" style="background:${typeColor}; color:${o.res_type==='pharmacy' || o.res_type==='wassayni' || o.res_type==='flowers' || o.res_type==='sweets' ? '#fff' : '#000'};" onclick="acceptOrder('${o.id}', '${o.restaurant_name || o.res || o.res_name}')"><i class="fas fa-bolt"></i> قنص الطلب 🦅</button>
+                        <button class="btn-gold" style="background:${typeColor}; color:${o.res_type==='pharmacy' || o.res_type==='wassayni' || o.res_type==='flowers' || o.res_type==='sweets' ? '#fff' : '#000'};" onclick="acceptOrder('${o.id}', '${escHtml(o.restaurant_name || o.res || o.res_name).replace(/'/g,'&#39;')}')"><i class="fas fa-bolt"></i> قنص الطلب 🦅</button>
                     </div>`;
             });
         } else {
@@ -4037,6 +4102,11 @@
             if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
             _refreshOrdersLock = false; _acceptOrderPending = false; _finishOrderPending = false;
             await supabaseClient.auth.signOut();
+            // [MULTI-DEVICE-UNLOCK] مسح معرف الجهاز من قاعدة البيانات عند تسجيل الخروج لإتاحة الدخول من جهاز آخر
+            if (currentUserData && currentUserData.id) {
+                await supabaseClient.from('drivers').update({ active_device_id: null }).eq('id', currentUserData.id).catch(()=>{});
+            }
+            // [END-MULTI-DEVICE-UNLOCK]
             localStorage.removeItem('shaheen_driver');
             localStorage.removeItem('shaheen_driver_remember');
             localStorage.removeItem('shaheen_work_status');
@@ -6198,7 +6268,7 @@
             await checkAndRenderTamweelStatus();
 
         } catch(e) {
-            console.error('submitFinancingRequest:', e);
+            // [FIX-SEC-D1g] console.error محذوف في الإنتاج — لا نكشف تفاصيل الخطأ
             siteNotify("فشل الإرسال: " + (e.message || e.toString()).substring(0, 80));
             if (btn) { btn.disabled = false; btn.innerHTML = origText; }
         }
@@ -6334,6 +6404,10 @@ CREATE TABLE IF NOT EXISTS public.sh_driver_daily_closings (
   created_at  timestamptz DEFAULT now()
 );
 ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;
+     ═══════════════════════════════════════════════════════════
+     FIX-MULTI-DEVICE: شغّل هذا الـ SQL أيضاً لتفعيل نظام منع تعدد الأجهزة:
+     ═══════════════════════════════════════════════════════════
+ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS active_device_id text DEFAULT NULL;
      ═══════════════════════════════════════════════════════════ -->
 </body>
 </html>
