@@ -1778,7 +1778,9 @@
     function _showScreenSizeModal() {
         // يظهر فقط إذا لم يختر المستخدم مسبقاً
         const alreadyChosen = localStorage.getItem('shaheen_screen_size_chosen');
-        if (alreadyChosen) return;
+        if (alreadyChosen) { applyStoredScale(); return; }
+        // تطبيق ضبط تلقائي مؤقت ريثما يختار
+        setAppScaleAuto();
         _selectedScreenSize = 'auto';
         document.querySelectorAll('.screen-size-option').forEach(el => el.classList.remove('selected'));
         const autoEl = document.getElementById('sso-auto');
@@ -2071,8 +2073,6 @@
         supabaseClient.from('drivers').update({ active_device_id: _currentDeviceId }).eq('id', driver.id).then(()=>{}).catch(()=>{});
         // [END-MULTI-DEVICE-LOCK]
         siteNotify('تم تسجيل الدخول بنجاح! 🦅');
-        // عرض مودال اختيار حجم الشاشة مرة واحدة عند أول تسجيل دخول
-        setTimeout(() => _showScreenSizeModal(), 800);
         // GPS في الخلفية
         setTimeout(() => {
             if (navigator.geolocation) {
@@ -4235,6 +4235,8 @@
             localStorage.removeItem('shaheen_driver');
             localStorage.removeItem('shaheen_driver_remember');
             localStorage.removeItem('shaheen_work_status');
+            // [FIX-LOGOUT] الحفاظ على تفضيل حجم الشاشة بعد تسجيل الخروج
+            // app_scale و shaheen_screen_size_chosen تبقى محفوظة حتى لا يُسأل مجدداً
             location.reload();
         }
     }
@@ -6485,6 +6487,8 @@
     // ===== نهاية دالة طلب فسخ العقد =====
 
     window.addEventListener('DOMContentLoaded', () => {
+        // عرض مودال حجم الشاشة أول ما يفتح التطبيق — مرة واحدة فقط
+        _showScreenSizeModal();
         applyStoredScale();
         initSystem();
     });
