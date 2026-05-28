@@ -495,6 +495,25 @@
     </div>
     <!-- ===== نهاية مودال تأكيد تسجيل الخروج ===== -->
 
+    <!-- ===== مودال تسجيل دخول من جهاز جديد ===== -->
+    <div id="new-device-modal" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:50000; display:none; flex-direction:column; justify-content:center; align-items:center; padding:24px; text-align:center; border-radius:inherit; backdrop-filter:blur(8px);">
+        <div style="background:var(--glass); border:2px solid rgba(212,175,55,0.6); border-radius:20px; padding:24px; width:100%;">
+            <i class="fas fa-mobile-alt" style="font-size:36px; color:var(--gold); margin-bottom:12px; display:block;"></i>
+            <h3 style="color:var(--gold); font-size:14px; margin:0 0 8px;">تسجيل دخول من جهاز جديد</h3>
+            <p style="color:#ccc; font-size:11px; line-height:1.7; margin:0 0 6px;">هذا الحساب مسجّل دخول على جهاز آخر.</p>
+            <p style="color:#aaa; font-size:10px; line-height:1.7; margin:0 0 20px;">إذا ضغطت <b style="color:#fff;">موافق</b> سيتم تسجيل الخروج من الجهاز السابق تلقائياً والدخول من هذا الجهاز.</p>
+            <div style="display:flex; gap:10px;">
+                <button id="new-device-cancel-btn" onclick="_cancelNewDevice()" style="flex:1; background:rgba(255,255,255,0.05); border:1px solid #555; color:#aaa; padding:12px; border-radius:10px; font-size:12px; cursor:pointer;">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+                <button id="new-device-confirm-btn" onclick="_confirmNewDevice()" style="flex:1; background:rgba(212,175,55,0.2); border:1px solid var(--gold); color:var(--gold); padding:12px; border-radius:10px; font-size:12px; font-weight:bold; cursor:pointer;">
+                    <i class="fas fa-check"></i> موافق، ادخل
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- ===== نهاية مودال تسجيل دخول من جهاز جديد ===== -->
+
         <div id="p-auth" class="page active" style="justify-content: center; align-items: center; text-align: center;">
         <img src="https://i.postimg.cc/QxzPkmPf/Whats-App-Image-2026-04-10-at-6-22-30-PM-t7edrz.jpg" style="width:80px; margin-bottom:12px; border-radius:50%; border:2px solid var(--gold);">
         <h2 style="color:var(--gold); font-size: 16px;">دخول الصقور 🦅</h2>
@@ -1731,7 +1750,7 @@
     let historyFilter = 'all';
 
     // ===== دوال التحكم بحجم الشاشة — نظام الشاشة الحرة =====
-    function setAppScale(scale) {
+    function setAppScale(scale, _silent) {
         const shell = document.querySelector('.app-shell');
         if(!shell) return;
         // في وضع الشاشة الحرة: لا نستخدم scale/transform
@@ -1755,9 +1774,10 @@
         const pct = Math.round(scale * 100);
         const el = document.getElementById('current-scale-val');
         if(el) el.innerText = pct + '%';
-        siteNotify(`تم ضبط حجم الواجهة: ${pct}% ✅`);
+        // [FIX-SCALE-RELOAD] لا نعرض إشعار عند التهيئة التلقائية
+        if (!_silent) siteNotify(`تم ضبط حجم الواجهة: ${pct}% ✅`);
     }
-    function setAppScaleAuto() {
+    function setAppScaleAuto(_silent) {
         // يُحسب الـ scale بحيث يملأ الشاشة بالكامل
         const vw = window.innerWidth;
         const vh = window.innerHeight;
@@ -1765,27 +1785,26 @@
         const scaleH = vh / 812;
         const autoScale = Math.min(scaleW, scaleH);
         const finalScale = Math.max(autoScale, 0.5);
-        setAppScale(Math.round(finalScale * 100) / 100);
+        setAppScale(Math.round(finalScale * 100) / 100, _silent);
     }
     function applyStoredScale() {
-        // عند فتح الموقع: دائماً ضبط تلقائي حسب الشاشة
-        setAppScaleAuto();
-        // ثم إذا كان المستخدم قد حدد حجماً مخصصاً نطبقه
+        // [FIX-SCALE-RELOAD] عند فتح الموقع أو تحديثه: نطبق الحجم المحفوظ مباشرة بدون إشعار
         const stored = parseFloat(localStorage.getItem('app_scale'));
         if(stored && stored > 0) {
-            setAppScale(stored);
+            setAppScale(stored, true);
         } else {
-            // لا يوجد تفضيل مخزّن: ضبط تلقائي
-            setAppScaleAuto();
+            // لا يوجد تفضيل مخزّن: ضبط تلقائي صامت
+            setAppScaleAuto(true);
         }
     }
     // مستمع لتغيير حجم النافذة — يُعيد الضبط التلقائي فوراً
     window.addEventListener('resize', () => {
+        // [FIX-SCALE-RELOAD] عند تغيير حجم النافذة: نطبق المحفوظ صامتاً
         const stored = parseFloat(localStorage.getItem('app_scale'));
         if(stored && stored > 0) {
-            setAppScale(stored);
+            setAppScale(stored, true);
         } else {
-            setAppScaleAuto();
+            setAppScaleAuto(true);
         }
     });
     // ===== نهاية دوال حجم الشاشة =====
@@ -1798,7 +1817,7 @@
         const alreadyChosen = localStorage.getItem('shaheen_screen_size_chosen');
         if (alreadyChosen) { applyStoredScale(); return; }
         // تطبيق ضبط تلقائي مؤقت ريثما يختار
-        setAppScaleAuto();
+        setAppScaleAuto(true);
         _selectedScreenSize = 'auto';
         document.querySelectorAll('.screen-size-option').forEach(el => el.classList.remove('selected'));
         const autoEl = document.getElementById('sso-auto');
@@ -1834,6 +1853,43 @@
         if (modal) modal.style.display = 'none';
     }
     // ===== نهاية مودال اختيار حجم الشاشة =====
+
+    // ===== دوال مودال الجهاز الجديد =====
+    let _pendingNewDeviceDriver = null;
+    let _pendingNewDeviceBtn    = null;
+
+    function _showNewDeviceModal(driver, btn) {
+        _pendingNewDeviceDriver = driver;
+        _pendingNewDeviceBtn    = btn;
+        const modal = document.getElementById('new-device-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function _cancelNewDevice() {
+        _pendingNewDeviceDriver = null;
+        _pendingNewDeviceBtn    = null;
+        const modal = document.getElementById('new-device-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function _confirmNewDevice() {
+        const modal = document.getElementById('new-device-modal');
+        if (modal) modal.style.display = 'none';
+        const confirmBtn = document.getElementById('new-device-confirm-btn');
+        if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.innerText = 'جارٍ الدخول...'; }
+        if (!_pendingNewDeviceDriver || !_pendingNewDeviceBtn) return;
+        // فك ارتباط الجهاز القديم وتسجيل الجهاز الحالي
+        try {
+            await supabaseClient.from('drivers')
+                .update({ active_device_id: _currentDeviceId })
+                .eq('id', _pendingNewDeviceDriver.id);
+        } catch(e) {}
+        // أكمل تسجيل الدخول
+        await _loginWithDriver(_pendingNewDeviceDriver, _pendingNewDeviceBtn);
+        _pendingNewDeviceDriver = null;
+        _pendingNewDeviceBtn    = null;
+    }
+    // ===== نهاية دوال مودال الجهاز الجديد =====
 
     function siteNotify(msg) {
         const n = document.getElementById('site-notify');
@@ -2076,14 +2132,15 @@
                 }
             } catch(e) { /* تجاهل خطأ التحليل */ }
         }
-        // [MULTI-DEVICE-BLOCK] منع تسجيل الدخول لنفس الحساب من جهاز مختلف منعاً باتاً
+        // [MULTI-DEVICE-BLOCK] إذا الحساب مسجّل على جهاز آخر — اسأل المستخدم بمودال
         try {
             const { data: _freshDrvRecord } = await supabaseClient.from('drivers')
                 .select('active_device_id').eq('id', driver.id).single();
             if (_freshDrvRecord && _freshDrvRecord.active_device_id &&
                 _freshDrvRecord.active_device_id !== _currentDeviceId) {
-                siteNotify('⛔ هذا الحساب مسجّل دخول على جهاز آخر — يجب تسجيل الخروج من الجهاز الأول أولاً');
+                // إظهار مودال تأكيد تسجيل الدخول من جهاز جديد
                 btn.disabled = false; btn.innerText = 'دخول النظام';
+                _showNewDeviceModal(driver, btn);
                 return;
             }
         } catch (_mdCheckErr) { /* تجاهل خطأ الفحص والمتابعة */ }
