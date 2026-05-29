@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- [PWA-FIX-CACHE] منع التخزين المؤقت في WebView/APK لضمان تحميل النسخة الحية دائماً -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>لوحة الصقر | شاهين إكسبريس 🦅</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2153,6 +2160,22 @@
         // [MULTI-DEVICE-LOCK] تسجيل معرف الجهاز في قاعدة البيانات لربط الحساب بهذا الجهاز
         supabaseClient.from('drivers').update({ active_device_id: _currentDeviceId }).eq('id', driver.id).then(()=>{}).catch(()=>{});
         // [END-MULTI-DEVICE-LOCK]
+        // [FCM-LOGIN] طلب صلاحية الإشعارات وحفظ التوكن عند تسجيل الدخول
+        setTimeout(() => {
+            if (typeof requestNotificationPermission === 'function') {
+                requestNotificationPermission().then(granted => {
+                    if (granted && typeof saveFCMTokenForDriver === 'function') {
+                        saveFCMTokenForDriver(driver.id);
+                    }
+                });
+            }
+            // التوكن النيتيف (من Website2APK) — حفظه إن كان متاحاً
+            const _nativeToken = localStorage.getItem('shaheen_fcm_token_native');
+            if (_nativeToken) {
+                supabaseClient.from('drivers').update({ fcm_token: _nativeToken }).eq('id', driver.id).catch(() => {});
+            }
+        }, 2500);
+        // [END-FCM-LOGIN]
         siteNotify('تم تسجيل الدخول بنجاح! 🦅');
         // GPS في الخلفية
         setTimeout(() => {
@@ -2223,6 +2246,8 @@
                 } catch(e) { /* تجاهل أخطاء الفحص الدوري */ }
             }, 15000);
             
+            // [PWA-FIX-D1] إزالة القناة القديمة قبل إنشاء جديدة لمنع التكديس عند إعادة التهيئة
+            try { supabaseClient.removeChannel(supabaseClient.channel('driver-status-check')); } catch(_e) {}
             supabaseClient
                 .channel('driver-status-check')
                 .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${currentUserData.id}` }, payload => {
@@ -2324,6 +2349,8 @@
                 });
 
             // ===== Realtime لطلبات التمويل: تختفي/تظهر الأيقونة فوراً =====
+            // [PWA-FIX-D2] إزالة قناة التمويل القديمة قبل إنشاء جديدة
+            try { supabaseClient.removeChannel(supabaseClient.channel('financing-status-realtime')); } catch(_e) {}
             supabaseClient.channel('financing-status-realtime')
                 .on('postgres_changes', {
                     event: 'UPDATE', schema: 'public', table: 'financing_requests'
@@ -6598,52 +6625,238 @@
     });
     window.addEventListener('online', function() {
         siteNotify('✅ عاد الاتصال');
-        if (currentUserData) refreshOrders();
-        if (currentOrderID) reconnectActiveOrder(currentOrderID);
+        if (currentUserData) _pwkWakeUpDriver();
     });
 
-        // [FIX-VIS-D4] إعادة تشغيل نظام الطلبات عند العودة للتبويب
+    // ================================================================
+    // [PWA-LIFECYCLE-DRIVER] نظام إعادة الاتصال الشامل للـ PWA/WebView/APK
+    // يحل مشكلة: النظام لا يعمل إلا بعد Refresh أو إعادة فتح التطبيق
+    // ================================================================
+    let _pwkDriverWakeupThrottle = 0;
+
+    async function _pwkWakeUpDriver() {
+        if (!currentUserData) return;
+        // منع الاستدعاء المتكرر خلال أقل من 2 ثانية
+        const _now = Date.now();
+        if (_now - _pwkDriverWakeupThrottle < 2000) return;
+        _pwkDriverWakeupThrottle = _now;
+
+        // 1. إعادة تشغيل مؤقت التحديث إذا توقف
+        if (!refreshInterval) startRefreshTimer();
+
+        // 2. إزالة جميع القنوات المتوقفة وإعادة الاشتراك
+        try { supabaseClient.removeChannel(supabaseClient.channel('driver-status-check')); } catch(_e) {}
+        try { supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime')); } catch(_e) {}
+        try { supabaseClient.removeChannel(supabaseClient.channel('financing-status-realtime')); } catch(_e) {}
+
+        // 2a. قناة حالة المندوب (تعليق / إيقاف)
+        supabaseClient.channel('driver-status-check')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drivers', filter: `id=eq.${currentUserData.id}` }, payload => {
+                if (payload.new.status !== 'active') {
+                    clearInterval(window._statusCheckInterval);
+                    document.getElementById('suspend-msg').innerText = "تم إيقاف حسابك من قبل الإدارة. تواصل معنا لإعادة التفعيل 🦅";
+                    document.getElementById('suspend-modal').style.display = 'flex';
+                    localStorage.removeItem('shaheen_driver');
+                } else {
+                    document.getElementById('suspend-modal').style.display = 'none';
+                    const emptyModal = document.getElementById('balance-empty-modal');
+                    if (emptyModal && payload.new.wallet_balance > 0) emptyModal.style.display = 'none';
+                    currentUserData = { ...currentUserData, ...payload.new };
+                    localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
+                    updateWalletUI();
+                    calculateWeeklyRating();
+                    if (document.getElementById('wallet-positive-rect')) document.getElementById('wallet-positive-rect').classList.remove('blurred-profit');
+                }
+            }).subscribe();
+
+        // 2b. قناة الطلبات الجديدة والتحديثات
+        supabaseClient.channel('public_orders_realtime')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sh_public_orders' }, payload => {
+                if (payload.new.is_consultation === true) return;
+                if (payload.new.status === 'searching' || payload.new.status === 'pending') {
+                    siteNotify("🦅 صيد جديد! طلب من " + (payload.new.restaurant_name || payload.new.res || payload.new.res_name));
+                    refreshOrders();
+                }
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sh_public_orders' }, payload => {
+                if (payload.new.id === currentOrderID && (payload.new.status === 'cancelled' || payload.new.status === 'completed')) {
+                    try { _closeDriverPath(payload.new.id); } catch(_e) {}
+                    currentOrderID = null;
+                    localStorage.removeItem('active_order_id');
+                    nav('p-main');
+                }
+                if (payload.new.status === 'accepted' && payload.new.driver_id && payload.new.driver_id !== (currentUserData ? currentUserData.id : null)) {
+                    const _cr = document.getElementById('order-card-' + payload.new.id);
+                    if (_cr) { _cr.style.opacity = '0'; setTimeout(() => { if (_cr.parentNode) _cr.parentNode.removeChild(_cr); }, 300); }
+                }
+                refreshOrders();
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'sh_public_orders' }, payload => {
+                if (payload.old && payload.old.id === currentOrderID) {
+                    currentOrderID = null;
+                    localStorage.removeItem('active_order_id');
+                    siteNotify("الطلب لم يعد متاحاً (تم الإلغاء)");
+                    nav('p-main');
+                }
+                refreshOrders();
+            })
+            .subscribe((st) => {
+                if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
+                    setTimeout(() => { if (currentUserData) refreshOrders(); }, 2000);
+                }
+            });
+
+        // 2c. قناة التمويل
+        supabaseClient.channel('financing-status-realtime')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'financing_requests' }, (payload) => {
+                if (payload.new && payload.new.driver_id === currentUserData.id) {
+                    const s = (payload.new.status || '').toLowerCase();
+                    try { _applyFinancingTabState(s, payload.new.financing_type); } catch(_e) {}
+                    currentFinancingData = { ...currentFinancingData, ...payload.new };
+                    if (s === 'completed') siteNotify('🏆 أحسنت! اكتمل سداد تمويلك بالكامل');
+                    else if (s === 'rejected') siteNotify('❌ تم رفض طلب التمويل. يمكنك تقديم طلب جديد');
+                    else if (s === 'approved' || s === 'active' || s === 'مفعّل') {
+                        siteNotify(payload.new.financing_type === 'wallet'
+                            ? '✅ تمت الموافقة على التمويل وإضافته لمحفظتك! 💳'
+                            : '✅ تمت الموافقة على طلب التمويل! راجع الإدارة لاستلام المبلغ 💵');
+                    }
+                }
+            }).subscribe();
+
+        // 3. تحديث فوري للطلبات
+        refreshOrders();
+
+        // 4. إعادة الاتصال بالطلب النشط إن وجد
+        if (currentOrderID) {
+            setTimeout(() => { try { reconnectActiveOrder(currentOrderID); } catch(_e) {} }, 400);
+        }
+
+        // 5. إعادة تشغيل التتبع إذا كان المندوب أونلاين
+        const _wsStatus = localStorage.getItem('shaheen_work_status');
+        if (_wsStatus === 'online') {
+            setTimeout(() => { try { startAdminTracking(); } catch(_e) {} }, 700);
+        }
+    }
+
+    // [FIX-VIS-D4] إعادة الاتصال الشامل عند العودة للتطبيق
     document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible' && currentUserData) {
-            refreshOrders();
-            if (currentOrderID) reconnectActiveOrder(currentOrderID);
+            _pwkWakeUpDriver();
         }
     });
+
+    // [PWA-FIX-D3] pageshow: يُطلق عند استعادة الصفحة من bfcache (شائع في Android WebView)
+    window.addEventListener('pageshow', function(e) {
+        if (!currentUserData) return;
+        if (e.persisted) { _pwkWakeUpDriver(); return; }
+        setTimeout(() => { if (currentUserData && !refreshInterval) _pwkWakeUpDriver(); }, 1000);
+    });
+
+    // [PWA-FIX-D4] focus: بعض أدوات Website2APK تستخدمه بدل visibilitychange
+    window.addEventListener('focus', function() {
+        if (currentUserData) setTimeout(() => { _pwkWakeUpDriver(); }, 300);
+    });
+
+    // [PWA-FIX-D5] Watchdog: فحص دوري كل 25 ثانية لضمان بقاء الـ Realtime حياً
+    setInterval(() => {
+        if (!currentUserData) return;
+        const _ch = supabaseClient.channel('public_orders_realtime');
+        if (_ch && (_ch.state === 'errored' || _ch.state === 'closed' || _ch.state === 'leaving')) {
+            _pwkWakeUpDriver();
+        }
+    }, 25000);
 
 </script>
 
 <!-- ===== Firebase Cloud Messaging — إشعارات الدفع للمندوب ===== -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js";
-  import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging.js";
+  import { initializeApp }                     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getMessaging, getToken, onMessage }  from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+
+  // ─── إعدادات مشروع Firebase — مطابقة لـ google-services.json ──────────────
   const firebaseConfig = {
-    apiKey: "AIzaSyAS2dSLHBkOgazBtHGTH4QVHV_-yk2m_Ec",
-    authDomain: "shaheeeen-5e984.firebaseapp.com",
-    projectId: "shaheeeen-5e984",
-    storageBucket: "shaheeeen-5e984.firebasestorage.app",
-    messagingSenderId: "1037170142697",
-    appId: "1:1037170142697:web:9ae5212433e3e6e755ef78"
+    apiKey:            "AIzaSyA1ekna7xnbdu-Mqo34ik9scLa41Bd1A3E",
+    authDomain:        "shaheen-5a1bc.firebaseapp.com",
+    projectId:         "shaheen-5a1bc",
+    storageBucket:     "shaheen-5a1bc.firebasestorage.app",
+    messagingSenderId: "8978921835",
+    appId:             "1:8978921835:android:054356346cf8604b4df42e"
   };
-  const app = initializeApp(firebaseConfig);
+
+  // ─── VAPID Key — من Firebase Console → Project Settings → Cloud Messaging ──
+  // أضف الـ VAPID Key الخاص بمشروعك هنا
+  const VAPID_KEY = "BM4Tc11aEqLH9Q9nOD7gmRZDoZFbnaawllnY4zvq0JfxNyBnYeS4VQxc4EL9S8tAmDb3UNFYkgvhkxzZ6zbdXos";
+
+  const SB_URL = "https://ricoslplbhphydhtrufe.supabase.co";
+  const SB_KEY = "sb_publishable_k6LgEuwPLdCsBMCFC12wfQ_BSOJotuw";
+
+  const app       = initializeApp(firebaseConfig);
   const messaging = getMessaging(app);
-  // تسجيل الـ Service Worker وطلب الإذن
+
+  // ─── حفظ التوكن في Supabase مرتبطاً بالمندوب ─────────────────────────────
+  window.saveFCMTokenForDriver = async function(driverId) {
+    if (!driverId) return;
+    try {
+      const reg   = await navigator.serviceWorker.ready;
+      const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+      if (!token) return;
+      await fetch(`${SB_URL}/rest/v1/drivers?id=eq.${driverId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey':        SB_KEY,
+          'Authorization': 'Bearer ' + SB_KEY,
+          'Content-Type':  'application/json',
+          'Prefer':        'return=minimal',
+        },
+        body: JSON.stringify({ fcm_token: token }),
+      });
+      localStorage.setItem('shaheen_fcm_token', token);
+    } catch(_e) { /* تجاهل أخطاء FCM — لا تؤثر على عمل التطبيق */ }
+  };
+
+  // ─── استقبال الإشعارات والتطبيق مفتوح ────────────────────────────────────
+  onMessage(messaging, () => {
+    if (typeof refreshOrders === 'function')  refreshOrders();
+    if (typeof siteNotify   === 'function')   siteNotify("🦅 طلب جديد! يا سقر هناك طلبات في السماء");
+    try { new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3").play().catch(() => {}); } catch(_e) {}
+  });
+
+  // ─── معالجة التوكن النيتيف من Website2APK ────────────────────────────────
+  function _handleNativeToken(token) {
+    if (!token || token === localStorage.getItem('shaheen_fcm_token')) return;
+    localStorage.setItem('shaheen_fcm_token_native', token);
+    const _saved = localStorage.getItem('shaheen_driver');
+    if (_saved) {
+      try {
+        const _drv = JSON.parse(_saved);
+        if (_drv?.id) {
+          fetch(`${SB_URL}/rest/v1/drivers?id=eq.${_drv.id}`, {
+            method: 'PATCH',
+            headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ fcm_token: token }),
+          });
+        }
+      } catch(_e) {}
+    }
+  }
+  // معالجات التوكن النيتيف — كل أداة Website2APK تستخدم اسماً مختلفاً
+  window.onFCMToken            = _handleNativeToken;
+  window.onNewToken            = _handleNativeToken;
+  window.FirebaseTokenCallback = _handleNativeToken;
+  window.setFCMToken           = _handleNativeToken;
+
+  // ─── تسجيل Service Worker ────────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/firebase-messaging-sw.js')
-    .then((registration) => {
-      console.log('SW Registered');
-      
-      // طلب الإذن للحصول على التوكن
-      return getToken(messaging, { serviceWorkerRegistration: registration });
-    })
-    .then((currentToken) => {
-      if (currentToken) {
-        console.log('Token جاهز للإرسال للسيرفر:', currentToken);
-        // هنا يجب أن ترسل هذا التوكن لقاعدة بياناتك لربطه بملف المستخدم أو السائق
-      }
-    }).catch((err) => {
-      console.log('حدث خطأ:', err);
-    });
+      .catch(() => { /* اختياري للـ PWA — الـ APK يعتمد على Native Firebase */ });
   }
+
+  // ─── طلب صلاحية الإشعارات ────────────────────────────────────────────────
+  window.requestNotificationPermission = async function() {
+    try {
+      return (await Notification.requestPermission()) === 'granted';
+    } catch(_e) { return false; }
+  };
 </script>
 <!-- ===== نهاية Firebase Cloud Messaging ===== -->
 
