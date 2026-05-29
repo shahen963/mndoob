@@ -3134,8 +3134,8 @@
                 }
                 inboxList.innerHTML = messages.map(m => `
                     <div class="inbox-msg" style="${m.type === 'gm_stamp' ? 'background:linear-gradient(135deg,rgba(142,68,173,0.15),rgba(212,175,55,0.1)); border:1px solid rgba(142,68,173,0.4);' : ''}">
-                        <b>${m.type === 'gm_stamp' ? '🦅 الختم الرسمي:' : 'الإدارة:'}</b> ${m.message}
-                        <span class="inbox-time">${new Date(m.created_at).toLocaleString('ar-SY')}</span>
+                        <b>${m.type === 'gm_stamp' ? '🦅 الختم الرسمي:' : 'الإدارة:'}</b> ${escHtml(m.message)}
+                        <span class="inbox-time">${escHtml(new Date(m.created_at).toLocaleString('ar-SY'))}</span>
                     </div>
                 `).join('');
             }
@@ -4087,7 +4087,7 @@
             // حفظ بيانات اليوم مؤقتاً للإقفال
             window._dcTodayData = { ordersCount, todayProfit, todayCash, todayWalletComp, walletStart, walletNow };
 
-        } catch(e) { console.warn('loadDailyClosingCard:', e); }
+        } catch(e) { /* تجاهل أخطاء بطاقة الإقفال اليومي */ }
     }
 
     // تنفيذ الإقفال اليومي
@@ -4718,7 +4718,7 @@
             else if(order.res_type === 'sweets') { typeIcon = '<i class="fas fa-cookie-bite"></i>'; typeLabel = "حلويات"; typeColor = "#ff9f43"; }
             else if(order.res_type === 'wassayni') { typeIcon = '<i class="fas fa-paper-plane"></i>'; typeLabel = "صيني"; typeColor = "#2ecc71"; }
             document.getElementById('active-res-name').style.color = typeColor;
-            document.getElementById('active-res-name').innerHTML = `${typeIcon} ${typeLabel}: ${order.restaurant_name || order.res || order.res_name}`;
+            document.getElementById('active-res-name').innerHTML = `${typeIcon} ${typeLabel}: ${escHtml(order.restaurant_name || order.res || order.res_name)}`;
             let discountInfo = order.discount > 0 ? `<br><div style="background:rgba(231,76,60,0.15);border:1px solid #e74c3c;border-radius:8px;padding:6px 10px;margin-top:5px;text-align:center;font-weight:bold;color:#e74c3c;font-size:10px;">⚠️ تم استخدام كود خصم على هذا الطلب: -${parseFloat(order.discount).toLocaleString()} ل.س</div>` : "";
             // X = فاتورة المتجر/الصيدلية - نستخرجها من order_details إذا كانت صيدلية
             let X = 0;
@@ -4753,7 +4753,7 @@
             // إظهار موقع العميل الدقيق والمتجر إذا كانا متوفرين
             const _clientLocStr = (order.lat && order.lng) ? `<br><small style="color:#2ecc71; font-size:9px;">📍 موقع العميل محدد GPS ✅</small>` : (order.customer_address ? `<br><small style="color:#f39c12; font-size:9px;">📍 عنوان العميل: ${escHtml(order.customer_address)}</small>` : '');
             const _shopLocStr = (order.pickup_lat && order.pickup_lng) ? `<br><small style="color:#3498db; font-size:9px;">🏪 موقع المتجر محدد GPS ✅</small>` : (order.res_address ? `<br><small style="color:#aaa; font-size:9px;">🏪 عنوان المتجر: ${escHtml(order.res_address)}</small>` : '');
-            document.getElementById('active-bill-info').innerHTML = `<small style="display:block; color:var(--gold); font-weight:bold; margin-bottom:3px;">رقم الطلب: #${order.id}</small><b>👤 العميل:</b> ${order.customer_name}${_clientLocStr}${_shopLocStr}<br><b>🏪 المطعم/المتجر:</b> ${order.restaurant_name || order.res || order.res_name || '---'}<br><b>💊 فاتورة الصيدلية:</b> ${X.toLocaleString()} ل.س<br><b>🚗 سعر التوصيل:</b> ${Y.toLocaleString()} ل.س${_consultFeeLineActive}<br><b style="color:#3498db; font-size:13px;">💰 إجمالي الكاش المطلوب:</b> <span style="font-size:15px; font-weight:bold; color:#fff;">${J.toLocaleString()} ل.س</span> ${discountInfo}`;
+            document.getElementById('active-bill-info').innerHTML = `<small style="display:block; color:var(--gold); font-weight:bold; margin-bottom:3px;">رقم الطلب: #${escHtml(String(order.id))}</small><b>👤 العميل:</b> ${escHtml(order.customer_name)}${_clientLocStr}${_shopLocStr}<br><b>🏪 المطعم/المتجر:</b> ${escHtml(order.restaurant_name || order.res || order.res_name || '---')}<br><b>💊 فاتورة الصيدلية:</b> ${X.toLocaleString()} ل.س<br><b>🚗 سعر التوصيل:</b> ${Y.toLocaleString()} ل.س${_consultFeeLineActive}<br><b style="color:#3498db; font-size:13px;">💰 إجمالي الكاش المطلوب:</b> <span style="font-size:15px; font-weight:bold; color:#fff;">${J.toLocaleString()} ل.س</span> ${discountInfo}`;
             // --- خامساً: عرض تصنيف نوع الطلب في تفاصيل الطلب النشط ---
             const typeBadgeHTML = `<div style="display:inline-block; background:rgba(0,0,0,0.3); color:${typeColor}; padding:3px 10px; border-radius:10px; font-size:10px; border:1px solid ${typeColor}; font-weight:bold; margin-top:4px;">${typeIcon} نوع: ${typeLabel}</div>`;
             document.getElementById('active-bill-info').innerHTML += typeBadgeHTML;
@@ -5248,7 +5248,7 @@
         if (status === 'pending') {
             list.innerHTML = `<div style="text-align:center;padding:24px;color:#f39c12;"><i class="fas fa-clock" style="font-size:30px;margin-bottom:8px;display:block;opacity:0.6;"></i><p style="font-size:11px;margin:0;">في انتظار الموافقة من الإدارة<br><span style="font-size:10px;color:#888;">سيظهر جدول الأقساط بعد الموافقة</span></p></div>`;
         } else if (status === 'rejected') {
-            list.innerHTML = `<div style="text-align:center;padding:24px;color:#e74c3c;"><i class="fas fa-times-circle" style="font-size:30px;margin-bottom:8px;display:block;opacity:0.6;"></i><p style="font-size:11px;margin:0;">تم رفض الطلب${data.rejection_reason?'<br><span style=\"font-size:10px;color:#aaa;\">السبب: '+data.rejection_reason+'</span>':''}</p></div>`;
+            list.innerHTML = `<div style="text-align:center;padding:24px;color:#e74c3c;"><i class="fas fa-times-circle" style="font-size:30px;margin-bottom:8px;display:block;opacity:0.6;"></i><p style="font-size:11px;margin:0;">تم رفض الطلب${data.rejection_reason?'<br><span style=\"font-size:10px;color:#aaa;\">السبب: '+escHtml(data.rejection_reason)+'</span>':''}</p></div>`;
         } else {
             // ===== رأس الجدول =====
             list.innerHTML = `
@@ -5660,7 +5660,7 @@
                 setTimeout(() => {
                     window.open('https://wa.me/966546083283?text=' + waMsg, '_blank');
                 }, 1500);
-            } catch(waErr) { console.warn('WA notify:', waErr); }
+            } catch(e) { /* تجاهل أخطاء إشعار واتساب */ }
             // ===== نهاية إشعار واتساب =====
             regData = { name: '', phone: '', email: '', vehicle: '', license: '', governorate: '', age: '', termsAgreed: false };
             regDocFiles = { id: null, license: null, selfie: null };
@@ -5990,7 +5990,7 @@
             const nm = (currentAttendanceSession.orders_missed || 0) + 1; const ns = (currentAttendanceSession.orders_seen || 0) + 1;
             await supabaseClient.from('attendance_logs').update({ orders_missed: nm, orders_seen: ns }).eq('id', currentAttendanceSession.id);
             currentAttendanceSession.orders_missed = nm; currentAttendanceSession.orders_seen = ns;
-        } catch(e) { console.warn('_logMissedOrder:', e); }
+        } catch(e) { /* تجاهل أخطاء تسجيل الطلب الفائت */ }
     }
 
     async function _logAcceptedOrderDuringShift(orderId, orderData, responseSeconds) {
@@ -6001,7 +6001,7 @@
             const na = (currentAttendanceSession.orders_accepted || 0) + 1; const ns = (currentAttendanceSession.orders_seen || 0) + 1;
             await supabaseClient.from('attendance_logs').update({ orders_accepted: na, orders_seen: ns }).eq('id', currentAttendanceSession.id);
             currentAttendanceSession.orders_accepted = na; currentAttendanceSession.orders_seen = ns;
-        } catch(e) { console.warn('_logAcceptedOrder:', e); }
+        } catch(e) { /* تجاهل أخطاء تسجيل الطلب المقبول */ }
     }
 
     async function _applyShiftPenalties(sessionData) {
@@ -6286,7 +6286,7 @@
                 FIN_TYPE      = cfg.fin_target_type   || 'دبابة كهربائية';
                 FIN_MSG       = cfg.fin_target_message || '';
             }
-        } catch(cfgErr) { console.warn('config fetch:', cfgErr); }
+        } catch(cfgErr) { /* تجاهل أخطاء تحميل الإعدادات */ }
         // ===== إذا التمويل موقوف من الإدارة، أخفِ كل شيء =====
         if (FIN_STATUS !== 'active') {
             document.getElementById('t-financing') && (document.getElementById('t-financing').style.display = 'none');
