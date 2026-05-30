@@ -10,6 +10,18 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- ===== [PWA-IPHONE] أيقونات آيفون وإعدادات PWA ===== -->
+    <meta name="apple-mobile-web-app-title" content="شاهين إكسبريس">
+    <meta name="application-name" content="شاهين إكسبريس">
+    <meta name="theme-color" content="#0a010a">
+    <link rel="apple-touch-icon" href="https://drive.google.com/uc?export=view&id=1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0">
+    <link rel="apple-touch-icon" sizes="120x120" href="https://drive.google.com/uc?export=view&id=1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0">
+    <link rel="apple-touch-icon" sizes="152x152" href="https://drive.google.com/uc?export=view&id=1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0">
+    <link rel="apple-touch-icon" sizes="167x167" href="https://drive.google.com/uc?export=view&id=1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0">
+    <link rel="apple-touch-icon" sizes="180x180" href="https://drive.google.com/uc?export=view&id=1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0">
+    <link rel="shortcut icon" href="https://drive.google.com/uc?export=view&id=1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0">
+    <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22%D8%B4%D8%A7%D9%87%D9%8A%D9%86%20%D8%A5%D9%83%D8%B3%D8%A8%D8%B1%D9%8A%D8%B3%22%2C%22short_name%22%3A%22%D8%B4%D8%A7%D9%87%D9%8A%D9%86%22%2C%22theme_color%22%3A%22%230a010a%22%2C%22background_color%22%3A%22%23000000%22%2C%22display%22%3A%22standalone%22%2C%22orientation%22%3A%22portrait%22%2C%22start_url%22%3A%22%2F%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Dview%26id%3D1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fjpeg%22%7D%2C%7B%22src%22%3A%22https%3A%2F%2Fdrive.google.com%2Fuc%3Fexport%3Dview%26id%3D1KJOgQw-Fet-DBDVBQTUgNQ9Rq0nlWC_0%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fjpeg%22%7D%5D%7D">
+    <!-- ===== نهاية PWA-IPHONE ===== -->
     <title>لوحة الصقر | شاهين إكسبريس 🦅</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3134,8 +3146,8 @@
                 }
                 inboxList.innerHTML = messages.map(m => `
                     <div class="inbox-msg" style="${m.type === 'gm_stamp' ? 'background:linear-gradient(135deg,rgba(142,68,173,0.15),rgba(212,175,55,0.1)); border:1px solid rgba(142,68,173,0.4);' : ''}">
-                        <b>${m.type === 'gm_stamp' ? '🦅 الختم الرسمي:' : 'الإدارة:'}</b> ${m.message}
-                        <span class="inbox-time">${new Date(m.created_at).toLocaleString('ar-SY')}</span>
+                        <b>${m.type === 'gm_stamp' ? '🦅 الختم الرسمي:' : 'الإدارة:'}</b> ${escHtml(m.message)}
+                        <span class="inbox-time">${escHtml(new Date(m.created_at).toLocaleString('ar-SY'))}</span>
                     </div>
                 `).join('');
             }
@@ -3355,6 +3367,7 @@
                             </div>
                         </div>
                         ${(parseFloat(o.discount) > 0) ? '<div style="background:rgba(231,76,60,0.15);border:1px solid #e74c3c;border-radius:6px;padding:5px 8px;margin-bottom:5px;text-align:center;font-weight:bold;color:#e74c3c;font-size:10px;">⚠️ تم استخدام كود خصم على هذا الطلب</div>' : ''}
+                        ${o.order_details ? `<div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:6px;padding:6px 8px;margin-bottom:5px;font-size:10px;color:#ddd;line-height:1.5;direction:rtl;text-align:right;"><b style="color:#3498db;display:block;margin-bottom:3px;font-size:9px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b>${escHtml(o.order_details)}</div>` : ''}
                         <button class="btn-gold" style="background:${typeColor}; color:${o.res_type==='pharmacy' || o.res_type==='wassayni' || o.res_type==='flowers' || o.res_type==='sweets' ? '#fff' : '#000'};" onclick="acceptOrder('${o.id}', '${escHtml(o.restaurant_name || o.res || o.res_name).replace(/'/g,'&#39;')}')"><i class="fas fa-bolt"></i> قنص الطلب 🦅</button>
                     </div>`;
             });
@@ -3484,6 +3497,7 @@
                         <b style="color:#fff;font-size:12px;">${distanceKm}</b>
                     </div>
                     ${_snatchInvoiceRows}
+                    ${orderToCheck.order_details ? `<div style="margin-top:8px;background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:8px;padding:8px;"><b style="color:#3498db;display:block;font-size:10px;margin-bottom:4px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b><div style="font-size:11px;color:#ddd;line-height:1.6;white-space:pre-wrap;">${escHtml(orderToCheck.order_details)}</div></div>` : ''}
                 </div>
                 <div style="display:flex;gap:8px;">
                     <button style="flex:1;background:${snatchAccentColor};color:#fff;border:none;padding:10px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:11px;" onclick="confirmAcceptOrder('${id}', '${restaurantName}')"><i class="fas fa-bolt"></i> قنص الطلب ✅</button>
@@ -4087,7 +4101,7 @@
             // حفظ بيانات اليوم مؤقتاً للإقفال
             window._dcTodayData = { ordersCount, todayProfit, todayCash, todayWalletComp, walletStart, walletNow };
 
-        } catch(e) { console.warn('loadDailyClosingCard:', e); }
+        } catch(e) { /* تجاهل أخطاء بطاقة الإقفال اليومي */ }
     }
 
     // تنفيذ الإقفال اليومي
@@ -4718,7 +4732,7 @@
             else if(order.res_type === 'sweets') { typeIcon = '<i class="fas fa-cookie-bite"></i>'; typeLabel = "حلويات"; typeColor = "#ff9f43"; }
             else if(order.res_type === 'wassayni') { typeIcon = '<i class="fas fa-paper-plane"></i>'; typeLabel = "صيني"; typeColor = "#2ecc71"; }
             document.getElementById('active-res-name').style.color = typeColor;
-            document.getElementById('active-res-name').innerHTML = `${typeIcon} ${typeLabel}: ${order.restaurant_name || order.res || order.res_name}`;
+            document.getElementById('active-res-name').innerHTML = `${typeIcon} ${typeLabel}: ${escHtml(order.restaurant_name || order.res || order.res_name)}`;
             let discountInfo = order.discount > 0 ? `<br><div style="background:rgba(231,76,60,0.15);border:1px solid #e74c3c;border-radius:8px;padding:6px 10px;margin-top:5px;text-align:center;font-weight:bold;color:#e74c3c;font-size:10px;">⚠️ تم استخدام كود خصم على هذا الطلب: -${parseFloat(order.discount).toLocaleString()} ل.س</div>` : "";
             // X = فاتورة المتجر/الصيدلية - نستخرجها من order_details إذا كانت صيدلية
             let X = 0;
@@ -4753,7 +4767,7 @@
             // إظهار موقع العميل الدقيق والمتجر إذا كانا متوفرين
             const _clientLocStr = (order.lat && order.lng) ? `<br><small style="color:#2ecc71; font-size:9px;">📍 موقع العميل محدد GPS ✅</small>` : (order.customer_address ? `<br><small style="color:#f39c12; font-size:9px;">📍 عنوان العميل: ${escHtml(order.customer_address)}</small>` : '');
             const _shopLocStr = (order.pickup_lat && order.pickup_lng) ? `<br><small style="color:#3498db; font-size:9px;">🏪 موقع المتجر محدد GPS ✅</small>` : (order.res_address ? `<br><small style="color:#aaa; font-size:9px;">🏪 عنوان المتجر: ${escHtml(order.res_address)}</small>` : '');
-            document.getElementById('active-bill-info').innerHTML = `<small style="display:block; color:var(--gold); font-weight:bold; margin-bottom:3px;">رقم الطلب: #${order.id}</small><b>👤 العميل:</b> ${order.customer_name}${_clientLocStr}${_shopLocStr}<br><b>🏪 المطعم/المتجر:</b> ${order.restaurant_name || order.res || order.res_name || '---'}<br><b>💊 فاتورة الصيدلية:</b> ${X.toLocaleString()} ل.س<br><b>🚗 سعر التوصيل:</b> ${Y.toLocaleString()} ل.س${_consultFeeLineActive}<br><b style="color:#3498db; font-size:13px;">💰 إجمالي الكاش المطلوب:</b> <span style="font-size:15px; font-weight:bold; color:#fff;">${J.toLocaleString()} ل.س</span> ${discountInfo}`;
+            document.getElementById('active-bill-info').innerHTML = `<small style="display:block; color:var(--gold); font-weight:bold; margin-bottom:3px;">رقم الطلب: #${escHtml(String(order.id))}</small><b>👤 العميل:</b> ${escHtml(order.customer_name)}${_clientLocStr}${_shopLocStr}<br><b>🏪 المطعم/المتجر:</b> ${escHtml(order.restaurant_name || order.res || order.res_name || '---')}<br><b>💊 فاتورة الصيدلية:</b> ${X.toLocaleString()} ل.س<br><b>🚗 سعر التوصيل:</b> ${Y.toLocaleString()} ل.س${_consultFeeLineActive}<br><b style="color:#3498db; font-size:13px;">💰 إجمالي الكاش المطلوب:</b> <span style="font-size:15px; font-weight:bold; color:#fff;">${J.toLocaleString()} ل.س</span> ${discountInfo}`;
             // --- خامساً: عرض تصنيف نوع الطلب في تفاصيل الطلب النشط ---
             const typeBadgeHTML = `<div style="display:inline-block; background:rgba(0,0,0,0.3); color:${typeColor}; padding:3px 10px; border-radius:10px; font-size:10px; border:1px solid ${typeColor}; font-weight:bold; margin-top:4px;">${typeIcon} نوع: ${typeLabel}</div>`;
             document.getElementById('active-bill-info').innerHTML += typeBadgeHTML;
@@ -4762,6 +4776,17 @@
                 // إضافة بادج تحذيري للصيدلية في أعلى معلومات الطلب
                 document.getElementById('active-bill-info').innerHTML = `<div style="background:#3498db; color:#fff; padding:5px 10px; border-radius:8px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:10px;"><i class="fas fa-prescription-bottle-alt"></i> 🏥 طلب صيدلية — ألوان زرقاء مميزة</div>` + document.getElementById('active-bill-info').innerHTML;
             }
+            // [ORDER-DETAILS-DRIVER] عرض نص تفاصيل الطلب للمندوب إذا كان موجوداً
+            if (order.order_details && !order.order_details.includes('PHARMACY_TOTAL:')) {
+                const _existingBillInfo = document.getElementById('active-bill-info');
+                if (_existingBillInfo) {
+                    const _orderDetailBox = document.createElement('div');
+                    _orderDetailBox.style.cssText = 'background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:8px;padding:8px;margin-top:8px;direction:rtl;text-align:right;';
+                    _orderDetailBox.innerHTML = '<b style="color:#3498db;display:block;font-size:10px;margin-bottom:4px;"><i class="fas fa-file-alt"></i> تفاصيل الطلب:</b><div style="font-size:11px;color:#ddd;line-height:1.6;white-space:pre-wrap;">' + escHtml(order.order_details) + '</div>';
+                    _existingBillInfo.appendChild(_orderDetailBox);
+                }
+            }
+            // [END-ORDER-DETAILS-DRIVER]
             if(order.restaurant_note) {
                 const noteBox = document.getElementById('res-status-notification');
                 const noteText = document.getElementById('res-status-text');
@@ -4897,6 +4922,8 @@
                     </div>`;
             }
             const _invItemsHtml = _invItemsText ? `<div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:10px;margin-top:10px;white-space:pre-wrap;font-size:11px;color:#ddd;">${_invItemsText.trim()}</div>` : '';
+            // [ORDER-DETAILS-INV] عرض نص تفاصيل الطلب في الفاتورة إذا كان موجوداً وليس فاتورة صيدلية
+            const _orderDetailsInvHtml = (order.order_details && !order.order_details.includes('PHARMACY_TOTAL:')) ? `<div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:10px;padding:10px;margin-top:10px;direction:rtl;text-align:right;"><b style="color:#3498db;display:block;font-size:11px;margin-bottom:4px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b><div style="font-size:11px;color:#ddd;line-height:1.6;white-space:pre-wrap;">${escHtml(order.order_details)}</div></div>` : '';
             _invContentEl.innerHTML = `
                 <div style="background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.3);border-radius:12px;padding:12px;margin-bottom:10px;">
                     <div style="font-size:14px;font-weight:bold;color:#fff;margin-bottom:4px;">👤 ${_invCustomerName}</div>
@@ -4905,6 +4932,7 @@
                 </div>
                 <div style="text-align:left;">${_invRowsHtml}</div>
                 ${_invItemsHtml}
+                ${_orderDetailsInvHtml}
             `;
         }
     }
@@ -5248,7 +5276,7 @@
         if (status === 'pending') {
             list.innerHTML = `<div style="text-align:center;padding:24px;color:#f39c12;"><i class="fas fa-clock" style="font-size:30px;margin-bottom:8px;display:block;opacity:0.6;"></i><p style="font-size:11px;margin:0;">في انتظار الموافقة من الإدارة<br><span style="font-size:10px;color:#888;">سيظهر جدول الأقساط بعد الموافقة</span></p></div>`;
         } else if (status === 'rejected') {
-            list.innerHTML = `<div style="text-align:center;padding:24px;color:#e74c3c;"><i class="fas fa-times-circle" style="font-size:30px;margin-bottom:8px;display:block;opacity:0.6;"></i><p style="font-size:11px;margin:0;">تم رفض الطلب${data.rejection_reason?'<br><span style=\"font-size:10px;color:#aaa;\">السبب: '+data.rejection_reason+'</span>':''}</p></div>`;
+            list.innerHTML = `<div style="text-align:center;padding:24px;color:#e74c3c;"><i class="fas fa-times-circle" style="font-size:30px;margin-bottom:8px;display:block;opacity:0.6;"></i><p style="font-size:11px;margin:0;">تم رفض الطلب${data.rejection_reason?'<br><span style=\"font-size:10px;color:#aaa;\">السبب: '+escHtml(data.rejection_reason)+'</span>':''}</p></div>`;
         } else {
             // ===== رأس الجدول =====
             list.innerHTML = `
@@ -5660,7 +5688,7 @@
                 setTimeout(() => {
                     window.open('https://wa.me/966546083283?text=' + waMsg, '_blank');
                 }, 1500);
-            } catch(waErr) { console.warn('WA notify:', waErr); }
+            } catch(e) { /* تجاهل أخطاء إشعار واتساب */ }
             // ===== نهاية إشعار واتساب =====
             regData = { name: '', phone: '', email: '', vehicle: '', license: '', governorate: '', age: '', termsAgreed: false };
             regDocFiles = { id: null, license: null, selfie: null };
@@ -5990,7 +6018,7 @@
             const nm = (currentAttendanceSession.orders_missed || 0) + 1; const ns = (currentAttendanceSession.orders_seen || 0) + 1;
             await supabaseClient.from('attendance_logs').update({ orders_missed: nm, orders_seen: ns }).eq('id', currentAttendanceSession.id);
             currentAttendanceSession.orders_missed = nm; currentAttendanceSession.orders_seen = ns;
-        } catch(e) { console.warn('_logMissedOrder:', e); }
+        } catch(e) { /* تجاهل أخطاء تسجيل الطلب الفائت */ }
     }
 
     async function _logAcceptedOrderDuringShift(orderId, orderData, responseSeconds) {
@@ -6001,7 +6029,7 @@
             const na = (currentAttendanceSession.orders_accepted || 0) + 1; const ns = (currentAttendanceSession.orders_seen || 0) + 1;
             await supabaseClient.from('attendance_logs').update({ orders_accepted: na, orders_seen: ns }).eq('id', currentAttendanceSession.id);
             currentAttendanceSession.orders_accepted = na; currentAttendanceSession.orders_seen = ns;
-        } catch(e) { console.warn('_logAcceptedOrder:', e); }
+        } catch(e) { /* تجاهل أخطاء تسجيل الطلب المقبول */ }
     }
 
     async function _applyShiftPenalties(sessionData) {
@@ -6286,7 +6314,7 @@
                 FIN_TYPE      = cfg.fin_target_type   || 'دبابة كهربائية';
                 FIN_MSG       = cfg.fin_target_message || '';
             }
-        } catch(cfgErr) { console.warn('config fetch:', cfgErr); }
+        } catch(cfgErr) { /* تجاهل أخطاء تحميل الإعدادات */ }
         // ===== إذا التمويل موقوف من الإدارة، أخفِ كل شيء =====
         if (FIN_STATUS !== 'active') {
             document.getElementById('t-financing') && (document.getElementById('t-financing').style.display = 'none');
