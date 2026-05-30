@@ -2248,6 +2248,22 @@
                     clearTimeout(tid);
                     if(res.ok) {
                         const data = await res.json();
+                        // [FIX-DELETED-1] إذا كان السجل غير موجود = الحساب محذوف من الإدارة
+                        if(data && data.length === 0) {
+                            clearInterval(window._statusCheckInterval);
+                            localStorage.removeItem('shaheen_driver');
+                            localStorage.removeItem('shaheen_driver_remember');
+                            localStorage.removeItem('shaheen_work_status');
+                            try { await supabaseClient.auth.signOut(); } catch(e) {}
+                            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                            const authPage = document.getElementById('p-auth');
+                            if(authPage) authPage.classList.add('active');
+                            const mainTabs = document.getElementById('main-tabs');
+                            if(mainTabs) mainTabs.style.display = 'none';
+                            currentUserData = null;
+                            return;
+                        }
+                        // [END-FIX-DELETED-1]
                         if(data && data.length > 0 && data[0].status !== 'active') {
                             clearInterval(window._statusCheckInterval);
                             localStorage.removeItem('shaheen_driver');
@@ -2279,6 +2295,21 @@
                         if(document.getElementById('wallet-positive-rect')) document.getElementById('wallet-positive-rect').classList.remove('blurred-profit');
                     }
                 })
+                // [FIX-DELETED-2] الاستماع لحدث الحذف من قاعدة البيانات وتسجيل الخروج الفوري
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'drivers', filter: `id=eq.${currentUserData.id}` }, async () => {
+                    clearInterval(window._statusCheckInterval);
+                    localStorage.removeItem('shaheen_driver');
+                    localStorage.removeItem('shaheen_driver_remember');
+                    localStorage.removeItem('shaheen_work_status');
+                    try { await supabaseClient.auth.signOut(); } catch(e) {}
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    const authPage = document.getElementById('p-auth');
+                    if(authPage) authPage.classList.add('active');
+                    const mainTabs = document.getElementById('main-tabs');
+                    if(mainTabs) mainTabs.style.display = 'none';
+                    currentUserData = null;
+                })
+                // [END-FIX-DELETED-2]
                 .subscribe((status, err) => {
                     // [FIX-CHAT-D3] إعادة الاتصال عند انقطاع قناة المحفظة
                     if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -4338,8 +4369,15 @@
         if (_logoutModal) {
             document.body.appendChild(_logoutModal); // نقله لـ body لضمان ظهوره فوق كل شيء
             _logoutModal.style.display = 'flex';
+        } else {
+            // [FIX-LOGOUT-FALLBACK] إذا لم يوجد المودال — نفذ الخروج مباشرة
+            _doLogout();
         }
     }
+    // [FIX-LOGOUT-GLOBAL] ربط دوال الخروج بـ window لضمان وصول onclick من HTML
+    window.logout = logout;
+    window._doLogout = async function() { await _doLogout(); };
+    window._cancelLogout = function() { _cancelLogout(); };
 
     async function _doLogout() {
         const _logoutModal = document.getElementById('logout-confirm-modal');
@@ -5625,7 +5663,13 @@
                 email:        regData.email || null,
                 notes:        finalNotes,
                 status:       'pending_admin',
-                timestamp:    new Date().toISOString()
+                timestamp:    new Date().toISOString(),
+                // [FIX-HIRING-DOCS] تخزين الصور كحقول مستقلة في الجدول لسهولة الوصول من الإدارة
+                doc_national_id:     idUrl     || null,
+                doc_driving_license: licenseUrl || null,
+                doc_selfie:          selfieUrl  || null,
+                work_type:           regData.workType || 'freelance'
+                // [END-FIX-HIRING-DOCS]
             };
             
             // [FIX-SEC-D1c] console.log محذوف
