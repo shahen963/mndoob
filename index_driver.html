@@ -4396,21 +4396,22 @@
         if (window._shiftHeartbeat)         { clearInterval(window._shiftHeartbeat); window._shiftHeartbeat = null; }
         if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
         _refreshOrdersLock = false; _acceptOrderPending = false; _finishOrderPending = false;
-        try { await supabaseClient.auth.signOut(); } catch(e) {}
-        // [MULTI-DEVICE-UNLOCK] مسح معرف الجهاز من قاعدة البيانات عند تسجيل الخروج لإتاحة الدخول من جهاز آخر
-        if (currentUserData && currentUserData.id) {
-            await supabaseClient.from('drivers').update({ active_device_id: null }).eq('id', currentUserData.id).catch(()=>{});
-        }
-        // [END-MULTI-DEVICE-UNLOCK]
-        // [FIX-LOGOUT-SCALE] حفظ تفضيل حجم الشاشة الخاص بهذا المستخدم قبل مسح بياناته
+        // [FIX-LOGOUT-HANG] مسح البيانات المحلية وتسجيل الخروج أولاً بدون انتظار الشبكة
         const _logoutUserId = currentUserData && currentUserData.id ? currentUserData.id : 'default';
         const _savedScale = localStorage.getItem('app_scale');
         if (_savedScale) localStorage.setItem('shaheen_scale_' + _logoutUserId, _savedScale);
         localStorage.removeItem('shaheen_driver');
         localStorage.removeItem('shaheen_driver_remember');
         localStorage.removeItem('shaheen_work_status');
-        // app_scale و shaheen_screen_size_chosen تبقى محفوظة على الجهاز
         currentUserData = null;
+        // [FIX-LOGOUT-HANG] عمليات الشبكة في الخلفية بدون await — لا تعلق الخروج
+        try { supabaseClient.auth.signOut().catch(()=>{}); } catch(e) {}
+        // [MULTI-DEVICE-UNLOCK] مسح معرف الجهاز من قاعدة البيانات في الخلفية بدون انتظار
+        if (_logoutUserId && _logoutUserId !== 'default') {
+            supabaseClient.from('drivers').update({ active_device_id: null }).eq('id', _logoutUserId).catch(()=>{});
+        }
+        // [END-MULTI-DEVICE-UNLOCK]
+        // app_scale و shaheen_screen_size_chosen تبقى محفوظة على الجهاز
         location.reload();
     }
 
