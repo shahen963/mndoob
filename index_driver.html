@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- [SEC-PATCH-20] رؤوس أمان -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta name="referrer" content="no-referrer">
     <!-- [PWA-FIX-CACHE] منع التخزين المؤقت في WebView/APK لضمان تحميل النسخة الحية دائماً -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -1739,7 +1742,8 @@
     }
     const _currentDeviceId = _getDeviceId();
     // [SEC-FIX-D7] Brute Force Protection للمندوبين
-    let _driverLoginAttempts = 0, _driverLockUntil = 0;
+    // [SEC-PATCH-13] استمرارية القفل عبر إعادة التحميل باستخدام sessionStorage
+    let _driverLoginAttempts = parseInt(sessionStorage.getItem('_drv_attempts') || '0'), _driverLockUntil = parseInt(sessionStorage.getItem('_drv_lock_until') || '0');
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey, {
         auth: {
             persistSession: false,
@@ -2008,7 +2012,13 @@
                         .select('*').eq('phone', altPhone).limit(1);
                     if (!drivers2 || drivers2.length === 0) {
                         _driverLoginAttempts++;
-                        if (_driverLoginAttempts >= 5) { _driverLockUntil = Date.now()+60000; _driverLoginAttempts=0; }
+                        sessionStorage.setItem('_drv_attempts', _driverLoginAttempts);
+                        if (_driverLoginAttempts >= 5) {
+                            _driverLockUntil = Date.now()+60000;
+                            sessionStorage.setItem('_drv_lock_until', _driverLockUntil);
+                            _driverLoginAttempts=0;
+                            sessionStorage.setItem('_drv_attempts', '0');
+                        }
                         siteNotify('رقم الجوال غير مسجل في النظام ❌');
                         btn.disabled = false; btn.innerText = 'دخول النظام';
                         return;
@@ -2077,7 +2087,13 @@
                         return _loginWithDriver(fallbackDrivers[0], btn);
                     }
                     _driverLoginAttempts++;
-                    if (_driverLoginAttempts >= 5) { _driverLockUntil = Date.now() + 60000; _driverLoginAttempts = 0; }
+                    sessionStorage.setItem('_drv_attempts', _driverLoginAttempts);
+                    if (_driverLoginAttempts >= 5) {
+                        _driverLockUntil = Date.now() + 60000;
+                        sessionStorage.setItem('_drv_lock_until', _driverLockUntil);
+                        _driverLoginAttempts = 0;
+                        sessionStorage.setItem('_drv_attempts', '0');
+                    }
                     siteNotify("الكود غير صحيح يا صقر 🦅"); // [SEC-FIX-D7]
                     btn.disabled = false; btn.innerText = "دخول النظام";
                     return;
@@ -2126,6 +2142,10 @@
     // ════ دالة دخول مشتركة ════
     async function _loginWithDriver(driver, btn) {
         if (!driver) { siteNotify('بيانات غير صحيحة'); btn.disabled=false; btn.innerText='دخول النظام'; return; }
+        // [SEC-PATCH-14] مسح عداد المحاولات عند نجاح تسجيل الدخول
+        _driverLoginAttempts = 0;
+        sessionStorage.removeItem('_drv_attempts');
+        sessionStorage.removeItem('_drv_lock_until');
         if (driver.status === 'suspended' || driver.status === 'locked') {
             document.getElementById('suspend-msg').innerText = 'حسابك موقف حالياً، راجع الإدارة';
             document.getElementById('suspend-modal').style.display = 'flex';
@@ -3849,7 +3869,7 @@
                     }, 2000);
                 }
             }, (err) => {
-                console.warn('GPS error:', err.code, err.message);
+                // [SEC-PATCH-24] إزالة console.warn الذي يكشف تفاصيل خطأ GPS
                 // Fallback: حاول كل 10 ثواني عند فشل watchPosition
                 if (!window._trackingFallbackTimer) {
                     window._trackingFallbackTimer = setInterval(() => {
@@ -3925,7 +3945,7 @@
         if (acc > 150 && spd !== null && spd > 30) {
             _fakeGPSWarnings++;
             if (_fakeGPSWarnings >= 3) {
-                console.warn('[FAKE GPS] مشتبه به — دقة:', acc, 'سرعة:', spd);
+                // [SEC-PATCH-24] إزالة console.warn لعدم كشف منطق الكشف للمستخدم
                 // إرسال تنبيه للإدارة
                 if (currentUserData) {
                     supabaseClient.from('notifications').insert([{
@@ -4243,7 +4263,7 @@
             if (error) {
                 // [FIX-PENDING-COL] إذا كان الخطأ بسبب عمود pending_orders غير موجود → أعد المحاولة بدونه
                 if (error.message && (error.message.includes('pending_orders') || error.message.includes('schema cache'))) {
-                    console.warn('[FIX-PENDING-COL] عمود pending_orders غير موجود في الجدول — إعادة المحاولة بدونه');
+                    // [SEC-PATCH-23] إزالة console.warn الذي يكشف بنية الجداول في الإنتاج
                     const closingRecordWithoutPending = Object.assign({}, closingRecord);
                     delete closingRecordWithoutPending.pending_orders;
                     const { error: error2 } = await supabaseClient
@@ -4252,7 +4272,7 @@
                     if (error2) {
                         if (error2.message && (error2.message.includes('does not exist') || error2.message.includes('42P01'))) {
                             siteNotify('⚠️ جدول الإقفال غير موجود. شغّل SQL الإعداد من لوحة الإدارة أو Supabase.');
-                            console.error('TABLE MISSING: sh_driver_daily_closings — run SQL in Supabase to create the table');
+                            // [SEC-PATCH-23] إزالة console.error الذي يكشف اسم الجدول
                             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> تنفيذ إقفال اليوم'; }
                             return;
                         }
@@ -4268,7 +4288,7 @@
                 // إذا الجدول غير موجود → أرسل رسالة واضحة مع SQL الإنشاء
                 if (error.message && (error.message.includes('does not exist') || error.message.includes('42P01'))) {
                     siteNotify('⚠️ جدول الإقفال غير موجود. شغّل SQL الإعداد من لوحة الإدارة أو Supabase.');
-                    console.error('TABLE MISSING: sh_driver_daily_closings — run SQL in Supabase to create the table');
+                    // [SEC-PATCH-23] إزالة console.error الذي يكشف اسم الجدول
                     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> تنفيذ إقفال اليوم'; }
                     return;
                 }
