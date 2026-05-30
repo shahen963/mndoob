@@ -497,8 +497,8 @@
     <!-- ===== نهاية مودال اختيار حجم الشاشة ===== -->
 
     <!-- ===== مودال تأكيد تسجيل الخروج — بديل confirm() لجميع الأجهزة ===== -->
-    <div id="logout-confirm-modal" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:50000; display:none; flex-direction:column; justify-content:center; align-items:center; padding:24px; text-align:center; border-radius:inherit; backdrop-filter:blur(8px);">
-        <div style="background:var(--glass); border:2px solid rgba(231,76,60,0.5); border-radius:20px; padding:24px; width:100%;">
+    <div id="logout-confirm-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; display:none; flex-direction:column; justify-content:center; align-items:center; padding:24px; text-align:center; backdrop-filter:blur(8px);">
+        <div style="background:var(--glass); border:2px solid rgba(231,76,60,0.5); border-radius:20px; padding:24px; width:90%; max-width:340px;">
             <i class="fas fa-sign-out-alt" style="font-size:36px; color:#e74c3c; margin-bottom:12px; display:block;"></i>
             <h3 style="color:#fff; font-size:15px; margin:0 0 8px;">تسجيل الخروج</h3>
             <p style="color:#aaa; font-size:11px; line-height:1.6; margin:0 0 20px;">هل تريد تسجيل الخروج يا صقر؟<br>لن يضيع طلبك المستلم 🦅</p>
@@ -4335,7 +4335,10 @@
     function logout() {
         // [FIX-LOGOUT-MODAL] استبدال confirm() بمودال مخصص يعمل على جميع الأجهزة والمتصفحات
         const _logoutModal = document.getElementById('logout-confirm-modal');
-        if (_logoutModal) _logoutModal.style.display = 'flex';
+        if (_logoutModal) {
+            document.body.appendChild(_logoutModal); // نقله لـ body لضمان ظهوره فوق كل شيء
+            _logoutModal.style.display = 'flex';
+        }
     }
 
     async function _doLogout() {
