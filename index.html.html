@@ -3367,6 +3367,7 @@
                             </div>
                         </div>
                         ${(parseFloat(o.discount) > 0) ? '<div style="background:rgba(231,76,60,0.15);border:1px solid #e74c3c;border-radius:6px;padding:5px 8px;margin-bottom:5px;text-align:center;font-weight:bold;color:#e74c3c;font-size:10px;">⚠️ تم استخدام كود خصم على هذا الطلب</div>' : ''}
+                        ${o.order_details ? `<div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:6px;padding:6px 8px;margin-bottom:5px;font-size:10px;color:#ddd;line-height:1.5;direction:rtl;text-align:right;"><b style="color:#3498db;display:block;margin-bottom:3px;font-size:9px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b>${escHtml(o.order_details)}</div>` : ''}
                         <button class="btn-gold" style="background:${typeColor}; color:${o.res_type==='pharmacy' || o.res_type==='wassayni' || o.res_type==='flowers' || o.res_type==='sweets' ? '#fff' : '#000'};" onclick="acceptOrder('${o.id}', '${escHtml(o.restaurant_name || o.res || o.res_name).replace(/'/g,'&#39;')}')"><i class="fas fa-bolt"></i> قنص الطلب 🦅</button>
                     </div>`;
             });
@@ -3496,6 +3497,7 @@
                         <b style="color:#fff;font-size:12px;">${distanceKm}</b>
                     </div>
                     ${_snatchInvoiceRows}
+                    ${orderToCheck.order_details ? `<div style="margin-top:8px;background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:8px;padding:8px;"><b style="color:#3498db;display:block;font-size:10px;margin-bottom:4px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b><div style="font-size:11px;color:#ddd;line-height:1.6;white-space:pre-wrap;">${escHtml(orderToCheck.order_details)}</div></div>` : ''}
                 </div>
                 <div style="display:flex;gap:8px;">
                     <button style="flex:1;background:${snatchAccentColor};color:#fff;border:none;padding:10px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:11px;" onclick="confirmAcceptOrder('${id}', '${restaurantName}')"><i class="fas fa-bolt"></i> قنص الطلب ✅</button>
@@ -4774,6 +4776,17 @@
                 // إضافة بادج تحذيري للصيدلية في أعلى معلومات الطلب
                 document.getElementById('active-bill-info').innerHTML = `<div style="background:#3498db; color:#fff; padding:5px 10px; border-radius:8px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:10px;"><i class="fas fa-prescription-bottle-alt"></i> 🏥 طلب صيدلية — ألوان زرقاء مميزة</div>` + document.getElementById('active-bill-info').innerHTML;
             }
+            // [ORDER-DETAILS-DRIVER] عرض نص تفاصيل الطلب للمندوب إذا كان موجوداً
+            if (order.order_details && !order.order_details.includes('PHARMACY_TOTAL:')) {
+                const _existingBillInfo = document.getElementById('active-bill-info');
+                if (_existingBillInfo) {
+                    const _orderDetailBox = document.createElement('div');
+                    _orderDetailBox.style.cssText = 'background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:8px;padding:8px;margin-top:8px;direction:rtl;text-align:right;';
+                    _orderDetailBox.innerHTML = '<b style="color:#3498db;display:block;font-size:10px;margin-bottom:4px;"><i class="fas fa-file-alt"></i> تفاصيل الطلب:</b><div style="font-size:11px;color:#ddd;line-height:1.6;white-space:pre-wrap;">' + escHtml(order.order_details) + '</div>';
+                    _existingBillInfo.appendChild(_orderDetailBox);
+                }
+            }
+            // [END-ORDER-DETAILS-DRIVER]
             if(order.restaurant_note) {
                 const noteBox = document.getElementById('res-status-notification');
                 const noteText = document.getElementById('res-status-text');
@@ -4909,6 +4922,8 @@
                     </div>`;
             }
             const _invItemsHtml = _invItemsText ? `<div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:10px;margin-top:10px;white-space:pre-wrap;font-size:11px;color:#ddd;">${_invItemsText.trim()}</div>` : '';
+            // [ORDER-DETAILS-INV] عرض نص تفاصيل الطلب في الفاتورة إذا كان موجوداً وليس فاتورة صيدلية
+            const _orderDetailsInvHtml = (order.order_details && !order.order_details.includes('PHARMACY_TOTAL:')) ? `<div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:10px;padding:10px;margin-top:10px;direction:rtl;text-align:right;"><b style="color:#3498db;display:block;font-size:11px;margin-bottom:4px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b><div style="font-size:11px;color:#ddd;line-height:1.6;white-space:pre-wrap;">${escHtml(order.order_details)}</div></div>` : '';
             _invContentEl.innerHTML = `
                 <div style="background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.3);border-radius:12px;padding:12px;margin-bottom:10px;">
                     <div style="font-size:14px;font-weight:bold;color:#fff;margin-bottom:4px;">👤 ${_invCustomerName}</div>
@@ -4917,6 +4932,7 @@
                 </div>
                 <div style="text-align:left;">${_invRowsHtml}</div>
                 ${_invItemsHtml}
+                ${_orderDetailsInvHtml}
             `;
         }
     }
