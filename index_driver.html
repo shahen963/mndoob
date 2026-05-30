@@ -434,6 +434,21 @@
         </div>
     </div>
 
+    <!-- ===== [NOTIF-MODAL] شاشة طلب الإشعارات الإجبارية ===== -->
+    <div id="notif-permission-modal" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); z-index:60000; display:none; flex-direction:column; justify-content:center; align-items:center; padding:24px; text-align:center; border-radius:inherit;">
+        <div style="width:80px; height:80px; background:var(--gold); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:16px; box-shadow:0 0 30px rgba(212,175,55,0.5);">
+            <i class="fas fa-bell" style="font-size:36px; color:#000;"></i>
+        </div>
+        <h2 style="color:var(--gold); font-size:18px; margin:0 0 10px;">السماح بالإشعارات 🔔</h2>
+        <p style="color:#fff; font-size:12px; line-height:1.8; margin:0 0 8px;">لاستقبال الطلبات الجديدة يجب السماح بالإشعارات.</p>
+        <p style="color:#e74c3c; font-size:11px; font-weight:bold; margin:0 0 24px;">⚠️ بدون إشعارات لن تصلك الطلبات!</p>
+        <button id="notif-allow-btn" onclick="_requestNotifNow()" style="width:100%; background:var(--gold); color:#000; border:none; padding:16px; border-radius:14px; font-size:15px; font-weight:bold; cursor:pointer; margin-bottom:10px; box-shadow:0 4px 20px rgba(212,175,55,0.4);">
+            <i class="fas fa-bell"></i> السماح بالإشعارات الآن
+        </button>
+        <p id="notif-status-text" style="color:#888; font-size:10px; margin:0;"></p>
+    </div>
+    <!-- ===== [END-NOTIF-MODAL] ===== -->
+
     <!-- ===== مودال: نفاد الرصيد المسبق ===== -->
     <div id="balance-empty-modal" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.97); z-index: 35000; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; border-radius: inherit;">
         <i class="fas fa-battery-empty" style="font-size:50px; color:#e74c3c; margin-bottom:15px; animation: pulse 1.5s infinite;"></i>
@@ -2234,6 +2249,9 @@
             // [END-MULTI-DEVICE-SESSION-CHECK]
             // FIX-LOGIN: تأجير التتبع لمنع تعليق صفحة الدخول
             setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 1500);
+            // [NOTIF-FORCE-RESTORE] إظهار شاشة الإشعارات عند استعادة الجلسة أيضاً
+            setTimeout(function() { if (typeof _showNotifModal === 'function') _showNotifModal(); }, 2000);
+            // [END-NOTIF-FORCE-RESTORE]
 
             // --- فحص دوري لحالة المندوب كل 15 ثانية كـ fallback إذا الـ realtime لم يشتغل ---
             if(window._statusCheckInterval) clearInterval(window._statusCheckInterval);
@@ -2526,6 +2544,9 @@
                 nav('p-main');
             }
             startRefreshTimer();
+            // [NOTIF-FORCE-CALL] إظهار شاشة طلب الإشعارات الإجبارية بعد تسجيل الدخول
+            setTimeout(function() { if (typeof _showNotifModal === 'function') _showNotifModal(); }, 800);
+            // [END-NOTIF-FORCE-CALL]
 
             const savedStatus = localStorage.getItem('shaheen_work_status');
             if (savedStatus === 'online') {
@@ -4409,6 +4430,64 @@
         const _logoutModal = document.getElementById('logout-confirm-modal');
         if (_logoutModal) _logoutModal.style.display = 'none';
     }
+
+    // ===== [NOTIF-FORCE] نظام طلب الإشعارات الإجباري =====
+    function _showNotifModal() {
+        const _modal = document.getElementById('notif-permission-modal');
+        if (!_modal) return;
+        // إذا كانت الإشعارات ممنوحة مسبقاً — لا نعرض الشاشة
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            // حفظ التوكن إذا لم يكن محفوظاً
+            if (currentUserData && typeof saveFCMTokenForDriver === 'function') {
+                saveFCMTokenForDriver(currentUserData.id);
+            }
+            return;
+        }
+        _modal.style.display = 'flex';
+    }
+
+    async function _requestNotifNow() {
+        const _btn = document.getElementById('notif-allow-btn');
+        const _statusTxt = document.getElementById('notif-status-text');
+        if (_btn) { _btn.disabled = true; _btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الطلب...'; }
+        if (_statusTxt) _statusTxt.innerText = '';
+        try {
+            let _permission = 'default';
+            // محاولة 1: Notification.requestPermission المعيارية
+            if (typeof Notification !== 'undefined') {
+                _permission = await Notification.requestPermission();
+            }
+            if (_permission === 'granted') {
+                // نجح — احفظ التوكن وأغلق الشاشة
+                if (currentUserData && typeof saveFCMTokenForDriver === 'function') {
+                    saveFCMTokenForDriver(currentUserData.id);
+                }
+                // تحقق من التوكن النيتيف من Website2APK
+                const _nativeToken = localStorage.getItem('shaheen_fcm_token_native');
+                if (_nativeToken && currentUserData) {
+                    supabaseClient.from('drivers').update({ fcm_token: _nativeToken }).eq('id', currentUserData.id).catch(() => {});
+                }
+                const _modal = document.getElementById('notif-permission-modal');
+                if (_modal) _modal.style.display = 'none';
+                localStorage.setItem('shaheen_notif_granted', '1');
+                siteNotify('✅ تم تفعيل الإشعارات — ستصلك الطلبات الآن 🦅');
+            } else if (_permission === 'denied') {
+                // مرفوض — نعرض تعليمات لإعادة التفعيل يدوياً
+                if (_btn) { _btn.disabled = false; _btn.innerHTML = '<i class="fas fa-redo"></i> أعد المحاولة'; }
+                if (_statusTxt) _statusTxt.innerHTML = '❌ تم رفض الإشعارات<br><span style="color:#e74c3c; font-size:10px;">افتح إعدادات الهاتف ← التطبيقات ← المتصفح ← الإشعارات ← فعّلها ثم اضغط أعد المحاولة</span>';
+            } else {
+                // default — أعد المحاولة
+                if (_btn) { _btn.disabled = false; _btn.innerHTML = '<i class="fas fa-bell"></i> السماح بالإشعارات الآن'; }
+                if (_statusTxt) _statusTxt.innerText = 'اضغط مرة أخرى وقبل الطلب في نافذة المتصفح';
+            }
+        } catch(_notifErr) {
+            if (_btn) { _btn.disabled = false; _btn.innerHTML = '<i class="fas fa-bell"></i> السماح بالإشعارات الآن'; }
+            if (_statusTxt) _statusTxt.innerText = 'حاول مرة أخرى';
+        }
+    }
+    window._requestNotifNow = _requestNotifNow;
+    window._showNotifModal  = _showNotifModal;
+    // ===== [END-NOTIF-FORCE] =====
 
     async function openConfirmModal() {
         if(!currentOrderID) return;
