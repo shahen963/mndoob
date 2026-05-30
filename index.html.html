@@ -1951,9 +1951,62 @@
         if(document.getElementById('main-work-status-checkbox')) document.getElementById('main-work-status-checkbox').checked = status;
         
         await supabaseClient.from('sh_admin_tracking').upsert({ id: currentUserData.id, status: statusText });
-        // تم تعطيل إيقاف التتبع عند إغلاق الحالة لضمان التتبع الدائم
-        // if (!status) { if(gpsWatch) navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
         if (status) setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 300);
+
+        // [FIX-REALTIME-TOGGLE] إعادة بناء قناة الطلبات فور تفعيل الاستقبال
+        // هذا يضمن وصول الطلبات فوراً بدون تحديث الصفحة
+        if (status) {
+            try { supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime')); } catch(_e) {}
+            supabaseClient
+                .channel('public_orders_realtime')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sh_public_orders' }, payload => {
+                    if(payload.new.is_consultation === true) return;
+                    if(payload.new.status === 'searching' || payload.new.status === 'pending') {
+                        siteNotify("🦅 صيد جديد! طلب من " + (payload.new.restaurant_name || payload.new.res || payload.new.res_name));
+                        refreshOrders();
+                    }
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sh_public_orders' }, payload => {
+                    if(payload.new.id === currentOrderID && (payload.new.status === 'cancelled' || payload.new.status === 'completed')) {
+                        _closeDriverPath(payload.new.id);
+                        currentOrderID = null;
+                        localStorage.removeItem('active_order_id');
+                        nav('p-main');
+                    }
+                    if(payload.new.status === 'accepted' && payload.new.driver_id && payload.new.driver_id !== currentUserData.id) {
+                        const cardToRemove = document.getElementById('order-card-' + payload.new.id);
+                        if(cardToRemove) {
+                            cardToRemove.style.transition = 'opacity 0.3s, transform 0.3s';
+                            cardToRemove.style.opacity = '0';
+                            cardToRemove.style.transform = 'scale(0.8)';
+                            setTimeout(() => { if(cardToRemove.parentNode) cardToRemove.parentNode.removeChild(cardToRemove); }, 300);
+                        }
+                    }
+                    refreshOrders();
+                })
+                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'sh_public_orders' }, payload => {
+                    if(payload.old && payload.old.id === currentOrderID) {
+                        currentOrderID = null;
+                        localStorage.removeItem('active_order_id');
+                        siteNotify("الطلب لم يعد متاحاً (تم الإلغاء)");
+                        nav('p-main');
+                    }
+                    refreshOrders();
+                })
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        // القناة جاهزة — جلب الطلبات الحالية فوراً
+                        refreshOrders();
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        setTimeout(() => {
+                            try { supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime')); } catch(e){}
+                            if (currentUserData && localStorage.getItem('shaheen_work_status') === 'online') refreshOrders();
+                        }, 3000);
+                    }
+                });
+        }
+        // [END-FIX-REALTIME-TOGGLE]
+
         siteNotify(status ? "أنت الآن متاح لاستقبال الطلبات 🦅" : "تم إيقاف استقبال الطلبات حالياً");
         refreshOrders(); 
     }
@@ -2269,8 +2322,7 @@
             // [END-MULTI-DEVICE-SESSION-CHECK]
             // FIX-LOGIN: تأجير التتبع لمنع تعليق صفحة الدخول
             setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 1500);
-            // [NOTIF-FORCE-RESTORE] إظهار شاشة الإشعارات عند استعادة الجلسة أيضاً
-            setTimeout(function() { if (typeof _showNotifModal === 'function') _showNotifModal(); }, 2000);
+            // [FIX-NOTIF-TIMING] إزالة _showNotifModal من هنا — ستُستدعى بعد إظهار الشاشة الرئيسية
             // [END-NOTIF-FORCE-RESTORE]
 
             // --- فحص دوري لحالة المندوب كل 15 ثانية كـ fallback إذا الـ realtime لم يشتغل ---
@@ -2456,6 +2508,8 @@
 
             document.getElementById('p-auth').classList.remove('active');
             document.getElementById('main-tabs').style.display = 'flex';
+            // [FIX-NOTIF-TIMING] الإشعارات تُطلب بعد ظهور الشاشة الرئيسية مباشرةً — لا قبلها
+            setTimeout(function() { if (typeof _showNotifModal === 'function') _showNotifModal(); }, 1500);
             // ===== الأيقونات تُضبط بواسطة checkDriverFinancing (تُستدعى لاحقاً) =====
             document.getElementById('profile-name').innerText = currentUserData.name || "صقر شاهين";
             document.getElementById('admin-driver-id').innerText = currentUserData.id.substring(0, 8).toUpperCase();
@@ -2564,9 +2618,60 @@
                 nav('p-main');
             }
             startRefreshTimer();
-            // [NOTIF-FORCE-CALL] إظهار شاشة طلب الإشعارات الإجبارية بعد تسجيل الدخول
-            setTimeout(function() { if (typeof _showNotifModal === 'function') _showNotifModal(); }, 800);
+            // [FIX-NOTIF-TIMING] الإشعارات بعد تسجيل الدخول — تُعرض بعد ظهور الشاشة الرئيسية
+            setTimeout(function() { if (typeof _showNotifModal === 'function') _showNotifModal(); }, 1500);
             // [END-NOTIF-FORCE-CALL]
+
+            // [FIX-REALTIME-AFTER-LOGIN] التأكد من أن قناة الطلبات مفعّلة بعد تسجيل الدخول
+            // تُعيد البناء دائماً حتى لو كانت موجودة — لضمان الاتصال الصحيح
+            setTimeout(function() {
+                try { supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime')); } catch(_e) {}
+                supabaseClient
+                    .channel('public_orders_realtime')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sh_public_orders' }, payload => {
+                        if(payload.new.is_consultation === true) return;
+                        if(payload.new.status === 'searching' || payload.new.status === 'pending') {
+                            siteNotify("🦅 صيد جديد! طلب من " + (payload.new.restaurant_name || payload.new.res || payload.new.res_name));
+                            refreshOrders();
+                        }
+                    })
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sh_public_orders' }, payload => {
+                        if(payload.new.id === currentOrderID && (payload.new.status === 'cancelled' || payload.new.status === 'completed')) {
+                            _closeDriverPath(payload.new.id);
+                            currentOrderID = null;
+                            localStorage.removeItem('active_order_id');
+                            nav('p-main');
+                        }
+                        if(payload.new.status === 'accepted' && payload.new.driver_id && payload.new.driver_id !== (currentUserData ? currentUserData.id : null)) {
+                            const cardToRemove = document.getElementById('order-card-' + payload.new.id);
+                            if(cardToRemove) {
+                                cardToRemove.style.transition = 'opacity 0.3s, transform 0.3s';
+                                cardToRemove.style.opacity = '0';
+                                cardToRemove.style.transform = 'scale(0.8)';
+                                setTimeout(() => { if(cardToRemove.parentNode) cardToRemove.parentNode.removeChild(cardToRemove); }, 300);
+                            }
+                        }
+                        refreshOrders();
+                    })
+                    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'sh_public_orders' }, payload => {
+                        if(payload.old && payload.old.id === currentOrderID) {
+                            currentOrderID = null;
+                            localStorage.removeItem('active_order_id');
+                            siteNotify("الطلب لم يعد متاحاً (تم الإلغاء)");
+                            nav('p-main');
+                        }
+                        refreshOrders();
+                    })
+                    .subscribe((status) => {
+                        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                            setTimeout(() => {
+                                try { supabaseClient.removeChannel(supabaseClient.channel('public_orders_realtime')); } catch(e){}
+                                if (currentUserData) refreshOrders();
+                            }, 3000);
+                        }
+                    });
+            }, 500);
+            // [END-FIX-REALTIME-AFTER-LOGIN]
 
             const savedStatus = localStorage.getItem('shaheen_work_status');
             if (savedStatus === 'online') {
