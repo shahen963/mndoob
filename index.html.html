@@ -1041,7 +1041,7 @@
             <button class="btn-gold" style="background:rgba(46,204,113,0.15); color:#2ecc71; border:1px solid #2ecc71; font-size:10px; margin-bottom:6px;" onclick="openContractForm('create')"><i class="fas fa-file-signature"></i> عرض عقد العمل</button>
             <button class="btn-gold" style="background:rgba(231,76,60,0.15); color:#e74c3c; border:1px solid #e74c3c; font-size:10px;" onclick="sendTerminationRequest()"><i class="fas fa-file-times"></i> فسخ عقد / إنهاء خدمة</button>
         </div>
-        <button class="btn-gold" style="background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); margin-top: 15px; font-size: 10px;" onclick="logout()"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج من النظام</button>
+        <button class="btn-gold" style="background: rgba(231, 76, 60, 0.1); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); margin-top: 15px; font-size: 10px;" onclick="localStorage.removeItem('shaheen_driver'); localStorage.removeItem('shaheen_driver_remember'); localStorage.removeItem('shaheen_work_status'); location.reload();"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج من النظام</button>
     </div>
 
     <div id="p-active-order" class="page">
@@ -2254,7 +2254,6 @@
                             localStorage.removeItem('shaheen_driver');
                             localStorage.removeItem('shaheen_driver_remember');
                             localStorage.removeItem('shaheen_work_status');
-                            try { await supabaseClient.auth.signOut(); } catch(e) {}
                             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                             const authPage = document.getElementById('p-auth');
                             if(authPage) authPage.classList.add('active');
@@ -2301,7 +2300,6 @@
                     localStorage.removeItem('shaheen_driver');
                     localStorage.removeItem('shaheen_driver_remember');
                     localStorage.removeItem('shaheen_work_status');
-                    try { await supabaseClient.auth.signOut(); } catch(e) {}
                     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
                     const authPage = document.getElementById('p-auth');
                     if(authPage) authPage.classList.add('active');
@@ -4397,8 +4395,7 @@
         localStorage.removeItem('shaheen_driver_remember');
         localStorage.removeItem('shaheen_work_status');
         currentUserData = null;
-        // [FIX-LOGOUT-HANG] عمليات الشبكة في الخلفية بدون await — لا تعلق الخروج
-        try { supabaseClient.auth.signOut().catch(()=>{}); } catch(e) {}
+        // [FIX-LOGOUT-HANG] النظام لا يستخدم Supabase Auth — حذف signOut() الذي كان يعلق الخروج
         // [MULTI-DEVICE-UNLOCK] مسح معرف الجهاز من قاعدة البيانات في الخلفية بدون انتظار
         if (_logoutUserId && _logoutUserId !== 'default') {
             supabaseClient.from('drivers').update({ active_device_id: null }).eq('id', _logoutUserId).catch(()=>{});
