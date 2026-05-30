@@ -4364,15 +4364,8 @@
     // ===== نهاية نظام الإقفال اليومي =====
     
     function logout() {
-        // [FIX-LOGOUT-MODAL] استبدال confirm() بمودال مخصص يعمل على جميع الأجهزة والمتصفحات
-        const _logoutModal = document.getElementById('logout-confirm-modal');
-        if (_logoutModal) {
-            document.body.appendChild(_logoutModal); // نقله لـ body لضمان ظهوره فوق كل شيء
-            _logoutModal.style.display = 'flex';
-        } else {
-            // [FIX-LOGOUT-FALLBACK] إذا لم يوجد المودال — نفذ الخروج مباشرة
-            _doLogout();
-        }
+        // [FIX-LOGOUT-DIRECT] تنفيذ الخروج مباشرة بدون مودال وسيط — المودال كان يتعلق بسبب مشاكل الـ z-index وposition:fixed داخل app-shell
+        _doLogout();
     }
     // [FIX-LOGOUT-GLOBAL] ربط دوال الخروج بـ window لضمان وصول onclick من HTML
     window.logout = logout;
