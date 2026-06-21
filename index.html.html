@@ -30,6 +30,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --gold: #d4af37; --purple: #1a051a; --glass: rgba(30, 10, 30, 0.95); }
+
+        /* ══ CUSTOM SCROLLBAR — تطبيق المناديب ══ */
+        ::-webkit-scrollbar { width: 3px; height: 3px; }
+        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, var(--gold), rgba(212,175,55,0.3)); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+        * { scrollbar-width: thin; scrollbar-color: var(--gold) transparent; }
+        .page { scroll-behavior: smooth; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; transition: 0.3s; }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #000; color: #fff; font-family: -apple-system, sans-serif; overflow: hidden; display: flex; justify-content: center; align-items: center; font-size: 11px; }
         
@@ -333,6 +341,17 @@
 <div class="app-shell">
     <div id="site-notify"></div>
 
+    <!-- [GPS-DEBUG-BANNER] شريط ثابت لا يختفي — لعرض خطأ حفظ الموقع بوضوح كامل لأخذ صورة له -->
+    <div id="gps-debug-banner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:99999; background:#7a0000; color:#fff; padding:12px 14px; font-size:12px; direction:rtl; line-height:1.6; box-shadow:0 4px 12px rgba(0,0,0,.5);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+            <div style="flex:1;">
+                <b>⚠️ خطأ حفظ الموقع — صوّر هذه الرسالة وأرسلها للإدارة:</b>
+                <div id="gps-debug-text" style="margin-top:6px; font-family:monospace; word-break:break-all; background:rgba(0,0,0,.3); padding:8px; border-radius:6px;"></div>
+            </div>
+            <button onclick="document.getElementById('gps-debug-banner').style.display='none'" style="background:#fff; color:#7a0000; border:none; border-radius:6px; padding:6px 10px; font-weight:bold; cursor:pointer; flex-shrink:0;">إغلاق ✕</button>
+        </div>
+    </div>
+
     <div id="pharmacy-invoice-modal">
         <div class="invoice-box">
             <div class="invoice-title" id="dynamic-invoice-title">🧾 فاتورة العميل</div>
@@ -453,7 +472,7 @@
     <!-- ===== [END-NOTIF-MODAL] ===== -->
 
     <!-- ===== مودال: نفاد الرصيد المسبق ===== -->
-    <div id="balance-empty-modal" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.97); z-index: 35000; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; border-radius: inherit;">
+    <div id="balance-empty-modal" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.97); z-index: 35000; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; border-radius: inherit; overflow-y:auto;">
         <i class="fas fa-battery-empty" style="font-size:50px; color:#e74c3c; margin-bottom:15px; animation: pulse 1.5s infinite;"></i>
         <h2 style="color:#e74c3c; font-size:18px; margin-bottom:8px;">نفد رصيدك! 🔴</h2>
         <p style="font-size:12px; color:#ccc; line-height:1.6; margin-bottom:15px;">رصيدك المسبق وصل إلى الصفر. لا يمكنك استقبال طلبات جديدة حتى تشحن رصيدك من خلال أقرب نقطة شحن معتمدة.</p>
@@ -462,7 +481,46 @@
             <div id="balance-empty-driver-id" style="font-size:20px; color:#fff; font-family:monospace; letter-spacing:3px; font-weight:bold;">SH---------</div>
             <div style="font-size:9px; color:#888; margin-top:4px;">أعطِ هذا الرقم لنقطة الشحن</div>
         </div>
-        <button class="btn-gold" style="background:#2ecc71; color:#fff; height:45px; font-size:13px; margin-bottom:8px;" onclick="openAdminChat()"><i class="fab fa-whatsapp"></i> تواصل مع الإدارة للشحن</button>
+        <!-- [RECHARGE-METHOD] اختيار طريقة الشحن -->
+        <div style="display:flex; gap:6px; width:100%; margin-bottom:12px;">
+            <button id="recharge-tab-shamcash" class="btn-gold" style="flex:1; height:38px; font-size:11px; background:var(--gold); color:#1a1a1a;" onclick="switchRechargeMethod('shamcash')">
+                <i class="fas fa-qrcode"></i> شام كاش
+            </button>
+            <button id="recharge-tab-manual" class="btn-gold" style="flex:1; height:38px; font-size:11px; background:transparent; color:var(--gold); border:1px solid var(--gold);" onclick="switchRechargeMethod('manual')">
+                <i class="fas fa-map-marker-alt"></i> نقطة شحن معتمدة
+            </button>
+        </div>
+
+        <!-- [RECHARGE-PAYMENT] باركود شام كاش + رقم الحساب — قابل للتعديل من لوحة الإدارة -->
+        <div id="recharge-method-shamcash">
+            <div id="recharge-payment-box" style="display:none; background:rgba(212,175,55,0.08); border:1px solid var(--gold); border-radius:12px; padding:15px; margin-bottom:15px; width:100%;">
+                <div style="font-size:11px; color:var(--gold); margin-bottom:10px; font-weight:bold;"><i class="fas fa-money-check-alt"></i> ادفع عبر شام كاش أو حوّل للحساب أدناه</div>
+                <img id="recharge-qr-img" src="" style="display:none; max-width:150px; border-radius:10px; border:2px solid var(--gold); margin-bottom:10px;" onload="this.style.display='inline-block'" onerror="this.style.display='none'">
+                <div id="recharge-account-box" style="display:none; background:rgba(0,0,0,0.3); border-radius:8px; padding:8px 10px; margin-top:6px;">
+                    <div style="font-size:9px; color:#888; margin-bottom:3px;">رقم الحساب / المحفظة</div>
+                    <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                        <span id="recharge-account-number-text" style="font-size:16px; color:#fff; font-family:monospace; letter-spacing:1px; font-weight:bold; direction:ltr;"></span>
+                        <i class="fas fa-copy" style="color:var(--gold); cursor:pointer; font-size:13px;" onclick="copyRechargeAccountNumber()"></i>
+                    </div>
+                    <div id="recharge-account-name-text" style="font-size:9px; color:#aaa; margin-top:4px;"></div>
+                </div>
+            </div>
+            <!-- [RECHARGE-REQUEST-MSG] نموذج طلب الشحن — رسالة جاهزة للإدارة بعد التحويل -->
+            <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(212,175,55,0.4); border-radius:12px; padding:12px; margin-bottom:12px; width:100%;">
+                <div style="font-size:11px; color:var(--gold); margin-bottom:8px; font-weight:bold;"><i class="fas fa-paper-plane"></i> بعد التحويل، عبّئ هذه البيانات وأرسلها للإدارة:</div>
+                <input type="number" id="recharge-amount-input" placeholder="المبلغ المُحوَّل (ل.س)" style="width:100%; margin-bottom:6px; padding:8px; font-size:12px; border-radius:8px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <input type="text" id="recharge-transfer-id-input" placeholder="رقم الحوالة / رقم العملية" style="width:100%; margin-bottom:6px; padding:8px; font-size:12px; border-radius:8px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+                <input type="text" id="recharge-sender-name-input" placeholder="اسم المحوِّل" style="width:100%; padding:8px; font-size:12px; border-radius:8px; border:1px solid #555; background:rgba(0,0,0,0.3); color:#fff;">
+            </div>
+            <button class="btn-gold" style="background:#2ecc71; color:#fff; height:45px; font-size:13px; margin-bottom:8px;" onclick="requestRechargeViaWhatsapp()"><i class="fab fa-whatsapp"></i> إرسال بيانات التحويل للإدارة</button>
+        </div>
+
+        <!-- [RECHARGE-MANUAL] قائمة نقاط الشحن المعتمدة — تُدار من الإدارة -->
+        <div id="recharge-method-manual" style="display:none; width:100%;">
+            <div style="font-size:11px; color:var(--gold); margin-bottom:10px; font-weight:bold;"><i class="fas fa-store-alt"></i> توجّه لأقرب نقطة شحن معتمدة وأعطهم رقم ID الشحن أعلاه:</div>
+            <div id="recharge-locations-list" style="width:100%;"><p style="color:#888; font-size:11px; text-align:center; padding:10px;"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</p></div>
+        </div>
+
         <button class="btn-gold" style="background:transparent; color:#888; border:1px solid #555; font-size:10px;" onclick="checkBalanceAndClose()"><i class="fas fa-sync"></i> فحص الرصيد من جديد</button>
     </div>
 
@@ -1072,6 +1130,22 @@
         <!-- [REMOVED] order-tracking-card محذوفة بناءً على طلب الإدارة -->
 
         <div id="active-bill-info" style="font-size: 9px; margin-top:6px; color:#aaa; background: rgba(212, 175, 55, 0.05); padding: 6px; border-radius: 8px;"></div>
+
+        <!-- [DRIVER-STATUS-MSG] أزرار تحديث حالة الطلب — كل زر يرسل رسالة ثابتة فورية للعميل -->
+        <div id="status-update-buttons" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;">
+            <button id="btn-at-restaurant" class="btn-gold" style="background:#2980b9; color:#fff; height:34px; font-size:10px; border:1px solid #3498db;" onclick="markArrivedAtRestaurant()">
+                <i class="fas fa-store"></i> وصلت المطعم 🏪
+            </button>
+            <button id="btn-ordered" class="btn-gold" style="background:#d35400; color:#fff; height:34px; font-size:10px; border:1px solid #e67e22;" onclick="markOrderedFromRestaurant()">
+                <i class="fas fa-clipboard-list"></i> طلبت من المطعم 📝
+            </button>
+            <button id="btn-picked-up" class="btn-gold" style="background:#8e44ad; color:#fff; height:34px; font-size:10px; border:1px solid #9b59b6;" onclick="markPickedUpFromRestaurant()">
+                <i class="fas fa-box"></i> استلمت الطلب 📦
+            </button>
+            <button id="btn-arrived" class="btn-gold" style="background:#16a085; color:#fff; height:34px; font-size:10px; border:1px solid #1abc9c;" onclick="markArrivedAtCustomer()">
+                <i class="fas fa-map-marker-alt"></i> وصلت 🦅
+            </button>
+        </div>
 
         <div id="pharmacy-invoice-btn-container" style="display: none; margin-top: 8px;">
             <button class="btn-gold" style="background: #27ae60; color: #fff; height: 35px; border: 1px solid #2ecc71;" onclick="showPharmacyInvoice()">
@@ -1757,6 +1831,48 @@
     window._GMAP_KEY = '';  // مثال: 'AIzaSyXXXXXXXXXXXXXXXXX'
     // ===== نهاية مفتاح Google Maps =====
 
+    // ════════════════════════════════════════════════════
+    //  [CURRENCY-SYS] نظام دعم العملة السورية (قديمة/جديدة)
+    //  مطابق تماماً لنفس النظام في لوحة الإدارة
+    // ════════════════════════════════════════════════════
+    window._currSettings = { mode:'both', newColor:'#22c55e', oldColor:'#ef4444' };
+    window._loadCurrencySettings = async function(){
+        try{
+            const r = await fetch(supabaseUrl+'/rest/v1/app_currency_settings?select=*&id=eq.1&limit=1', {
+                headers:{'apikey':supabaseKey,'Authorization':'Bearer '+supabaseKey}
+            });
+            if(!r.ok) return;
+            const rows = await r.json();
+            const row = rows[0];
+            if(row){
+                window._currSettings = {
+                    mode: row.display_mode || 'both',
+                    newColor: row.new_color || '#22c55e',
+                    oldColor: row.old_color || '#ef4444'
+                };
+            }
+        }catch(e){ /* استخدام الإعدادات الافتراضية بصمت لو فشل الجلب */ }
+    };
+    window.fmtSYP = function(oldAmount, opts){
+        opts = opts || {};
+        const s = window._currSettings || {mode:'both',newColor:'#22c55e',oldColor:'#ef4444'};
+        const oldVal = Math.round(parseFloat(oldAmount)||0);
+        const newVal = Math.round(oldVal/100);
+        const oldStr = oldVal.toLocaleString('en-US') + ' ل.س';
+        const newStr = newVal.toLocaleString('en-US') + ' ل.س';
+        const sizeStyle = opts.size ? `font-size:${opts.size}px;` : '';
+        const sep = opts.inline ? ' &nbsp; ' : '<br>';
+        let html = '';
+        if(s.mode==='new') html = `<span style="color:${s.newColor};font-weight:bold;${sizeStyle}">🟢 ${newStr}</span>`;
+        else if(s.mode==='old') html = `<span style="color:${s.oldColor};font-weight:bold;${sizeStyle}">🔴 ${oldStr}</span>`;
+        else html = `<span style="color:${s.newColor};font-weight:bold;${sizeStyle}">🟢 ${newStr}</span>${sep}<span style="color:${s.oldColor};${opts.inline?'font-weight:bold;':'font-size:11px;'}${sizeStyle}">🔴 ${oldStr}</span>`;
+        return html;
+    };
+    window._loadCurrencySettings(); // تحميل فوري عند بدء التطبيق
+    // ════════════════════════════════════════════════════
+    //  [END-CURRENCY-SYS]
+    // ════════════════════════════════════════════════════
+
     let currentOrderID = null;
     let gpsWatch = null;
     let orderCount = 0;
@@ -2286,8 +2402,21 @@
                 );
             }
         }, 2000);
-        if (parseFloat(driver.wallet_balance) <= 0) setTimeout(() => showBalanceEmptyModal(), 2000);
+        // [MIN-BALANCE] فحص الرصيد مقابل الحد الأدنى المُحدَّد من الإدارة بدل صفر ثابت
+        _getMinDriverBalance().then(minBal => {
+            if (parseFloat(driver.wallet_balance) <= minBal) setTimeout(() => showBalanceEmptyModal(), 2000);
+        });
         initSystem();
+    }
+
+    // [MIN-BALANCE] جلب الحد الأدنى المطلوب في حساب المندوب — يُحدَّد من لوحة الإدارة (تسوية المناديب)
+    window._minDriverBalance = 0;
+    async function _getMinDriverBalance() {
+        try {
+            const { data } = await supabaseClient.from('app_config').select('min_driver_balance').eq('id', 1).maybeSingle();
+            window._minDriverBalance = (data && data.min_driver_balance) ? parseFloat(data.min_driver_balance) : 0;
+        } catch(e) { window._minDriverBalance = 0; }
+        return window._minDriverBalance;
     }
 
     async function initSystem() {
@@ -2376,7 +2505,7 @@
                     } else {
                         document.getElementById('suspend-modal').style.display = 'none';
                         const emptyModal = document.getElementById('balance-empty-modal');
-                        if(emptyModal && payload.new.wallet_balance > 0) emptyModal.style.display = 'none';
+                        if(emptyModal && payload.new.wallet_balance > (window._minDriverBalance||0)) emptyModal.style.display = 'none';
                         currentUserData = { ...currentUserData, ...payload.new };
                         localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
                         updateWalletUI();
@@ -3136,20 +3265,118 @@
             modal.style.display = 'flex';
             const idEl = document.getElementById('balance-empty-driver-id');
             if(idEl && currentUserData) idEl.innerText = 'SH-' + currentUserData.id.substring(0,8).toUpperCase();
+            switchRechargeMethod('shamcash'); // [RECHARGE-METHOD] إعادة الضبط للوضع الافتراضي
+            _loadRechargePaymentInfo(); // [RECHARGE-PAYMENT]
         }
+    }
+
+    // [RECHARGE-PAYMENT] جلب باركود شام كاش ورقم الحساب من إعدادات الإدارة (قابلة للتعديل)
+    let _rechargeAccountNumberCache = '';
+    async function _loadRechargePaymentInfo() {
+        try {
+            const { data: config } = await supabaseClient.from('app_config')
+                .select('recharge_qr_url, recharge_account_number, recharge_account_name').eq('id', 1).single();
+            if (!config) return;
+            const box = document.getElementById('recharge-payment-box');
+            const qrImg = document.getElementById('recharge-qr-img');
+            const accBox = document.getElementById('recharge-account-box');
+            const accNumText = document.getElementById('recharge-account-number-text');
+            const accNameText = document.getElementById('recharge-account-name-text');
+            let hasContent = false;
+            if (config.recharge_qr_url && qrImg) { qrImg.src = config.recharge_qr_url; hasContent = true; }
+            if (config.recharge_account_number && accBox) {
+                accBox.style.display = 'block';
+                _rechargeAccountNumberCache = config.recharge_account_number;
+                if (accNumText) accNumText.innerText = config.recharge_account_number;
+                if (accNameText) accNameText.innerText = config.recharge_account_name || '';
+                hasContent = true;
+            }
+            if (hasContent && box) box.style.display = 'block';
+        } catch(e) { /* الأعمدة قد لا تكون موجودة بعد — لا داعي لإظهار خطأ للمندوب */ }
+    }
+
+    // [RECHARGE-METHOD] التبديل بين شام كاش ونقاط الشحن المعتمدة
+    function switchRechargeMethod(method) {
+        const tabShamcash = document.getElementById('recharge-tab-shamcash');
+        const tabManual = document.getElementById('recharge-tab-manual');
+        const boxShamcash = document.getElementById('recharge-method-shamcash');
+        const boxManual = document.getElementById('recharge-method-manual');
+        if (method === 'manual') {
+            boxShamcash.style.display = 'none';
+            boxManual.style.display = 'block';
+            tabManual.style.background = 'var(--gold)'; tabManual.style.color = '#1a1a1a';
+            tabShamcash.style.background = 'transparent'; tabShamcash.style.color = 'var(--gold)';
+            _loadRechargeLocations();
+        } else {
+            boxShamcash.style.display = 'block';
+            boxManual.style.display = 'none';
+            tabShamcash.style.background = 'var(--gold)'; tabShamcash.style.color = '#1a1a1a';
+            tabManual.style.background = 'transparent'; tabManual.style.color = 'var(--gold)';
+        }
+    }
+
+    // [RECHARGE-MANUAL] جلب نقاط الشحن المعتمدة من قاعدة البيانات (تُدار من لوحة الإدارة)
+    async function _loadRechargeLocations() {
+        const listEl = document.getElementById('recharge-locations-list');
+        if (!listEl) return;
+        try {
+            const { data: locations } = await supabaseClient.from('recharge_locations')
+                .select('*').eq('is_active', true).order('created_at', { ascending: true });
+            if (!locations || locations.length === 0) {
+                listEl.innerHTML = '<p style="color:#888; font-size:11px; text-align:center; padding:10px;">لا توجد نقاط شحن معتمدة مُسجَّلة حالياً — تواصل مع الإدارة</p>';
+                return;
+            }
+            listEl.innerHTML = locations.map(loc => `
+                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(212,175,55,0.3); border-radius:10px; padding:10px; margin-bottom:8px; text-align:right;">
+                    <div style="font-size:13px; color:var(--gold); font-weight:bold;"><i class="fas fa-store"></i> ${escHtml(loc.name)}</div>
+                    ${loc.address ? `<div style="font-size:11px; color:#ccc; margin-top:4px;"><i class="fas fa-map-marker-alt" style="color:#888;"></i> ${escHtml(loc.address)}</div>` : ''}
+                    ${loc.phone ? `<a href="https://wa.me/${escHtml(loc.phone.replace(/[^0-9]/g,''))}" target="_blank" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; color:#25d366; text-decoration:none; margin-top:6px;"><i class="fab fa-whatsapp"></i> ${escHtml(loc.phone)}</a>` : ''}
+                </div>`).join('');
+        } catch(e) {
+            listEl.innerHTML = '<p style="color:#888; font-size:11px; text-align:center; padding:10px;">تعذّر تحميل نقاط الشحن</p>';
+        }
+    }
+
+    function copyRechargeAccountNumber() {
+        if (!_rechargeAccountNumberCache) return;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(_rechargeAccountNumberCache).then(() => siteNotify('✅ تم نسخ رقم الحساب'));
+        } else {
+            prompt('رقم الحساب:', _rechargeAccountNumberCache);
+        }
+    }
+
+    // [RECHARGE-REQUEST-MSG] رسالة ثابتة جاهزة لطلب الشحن — تُرسَل للإدارة عبر واتساب بعد تعبئة بيانات التحويل
+    async function requestRechargeViaWhatsapp() {
+        const amount = document.getElementById('recharge-amount-input')?.value.trim();
+        const transferId = document.getElementById('recharge-transfer-id-input')?.value.trim();
+        const senderName = document.getElementById('recharge-sender-name-input')?.value.trim();
+        if (!amount) { siteNotify('⚠️ يرجى إدخال المبلغ المُحوَّل أولاً'); return; }
+        const driverName = (currentUserData && currentUserData.name) ? currentUserData.name : 'صقر شاهين';
+        let msg = `مرحباً شركة شاهين الصقور 🦅، أنا صقر ${driverName}، أرغب بشحن مبلغ: ${amount} ل.س. تم تحويل مبلغ: ${amount} ل.س`;
+        if (transferId) msg += ` - رقم الحوالة: ${transferId}`;
+        if (senderName) msg += ` - اسم المحوِّل: ${senderName}`;
+        // [ADMIN-NUMBER-DYNAMIC] جلب رقم الإدارة المُحدَّث من لوحة التحكم بدل رقم ثابت بالكود
+        let adminPhone = '966546083283';
+        try {
+            const { data: cfg } = await supabaseClient.from('app_config').select('contact_whatsapp1').eq('id', 1).maybeSingle();
+            if (cfg && cfg.contact_whatsapp1) adminPhone = cfg.contact_whatsapp1;
+        } catch(e) {}
+        window.open(`https://wa.me/${adminPhone}?text=${encodeURIComponent(msg)}`);
     }
 
     async function checkBalanceAndClose() {
         if(!currentUserData) return;
         const { data: driverData } = await supabaseClient.from('drivers').select('wallet_balance, status').eq('id', currentUserData.id).single();
         const bal = parseFloat(driverData?.wallet_balance) || 0;
-        if(bal > 0) {
+        const minBal = await _getMinDriverBalance(); // [MIN-BALANCE]
+        if(bal > minBal) {
             const modal = document.getElementById('balance-empty-modal');
             if(modal) modal.style.display = 'none';
             siteNotify("✅ تم شحن رصيدك! يمكنك العمل الآن 🦅");
             updateWalletUI();
         } else {
-            siteNotify("⚠️ الرصيد لا يزال صفراً. تواصل مع نقطة الشحن");
+            siteNotify("⚠️ الرصيد لا يزال أقل من الحد المطلوب. تواصل مع نقطة الشحن");
         }
     }
 
@@ -3378,6 +3605,7 @@
                 // إصلاح المشكلة الثالثة: الورود = زهري (#e91e8c) وليس بنفسجي (#8e44ad)
                 else if(o.res_type === 'flowers' || _hStype === 'flowers') { typeIcon = '<i class="fas fa-seedling"></i>'; typeLabel = 'ورود'; typeColor = '#e91e8c'; }
                 else if(o.res_type === 'sweets' || _hStype === 'sweets') { typeIcon = '<i class="fas fa-cookie-bite"></i>'; typeLabel = 'حلويات'; typeColor = '#8e44ad'; }
+                else if(o.res_type === 'family' || _hStype === 'family') { typeIcon = '<i class="fas fa-home"></i>'; typeLabel = 'أسرة منتجة'; typeColor = '#f472b6'; }
                 else if(o.res_type === 'wassayni') { typeIcon = '<i class="fas fa-paper-plane"></i>'; typeLabel = 'صيني'; typeColor = '#2ecc71'; }
                 else if(o.res_type === 'specialty') {
                     // إصلاح المشكلة الثالثة: الورود = زهري (#e91e8c) وليس بنفسجي (#8e44ad)
@@ -3391,7 +3619,7 @@
                     <div class="card" style="padding: 8px; border-right: 3px solid ${typeColor};">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <b style="font-size:11px; color:${typeColor};">${typeIcon} ${typeLabel}: ${o.restaurant_name || o.res || o.res_name}</b>
-                            <span style="font-size:10px; font-weight:bold;">${o.total ? o.total.toLocaleString() : '0'} ل.س</span>
+                            <span style="font-weight:bold;">${fmtSYP(o.total||0,{inline:true,size:10})}</span>
                         </div>
                         ${(o.res_type === 'pharmacy' || o.res_type === 'pharmacy_delivery') && (o.delivery_price || o.consultation_fee) ? `
                         <div style="margin-top:4px; background:rgba(52,152,219,0.08); border-radius:6px; padding:5px 8px; font-size:9px; color:#a8c8ff; line-height:1.9;">
@@ -3407,7 +3635,7 @@
                         </div>
                         ${o.status === 'cancelled' && o.cancel_reason ? `<div style="margin-top:5px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;padding:5px 8px;"><small style="color:#e74c3c;font-size:9px;"><i class="fas fa-info-circle"></i> سبب الإلغاء: ${o.cancel_reason}</small></div>` : ''}
                         <div style="margin-top:4px; font-size:8px; color:#888;">
-                            العميل: ${o.customer_name || '---'} | العنوان: ${o.customer_address || '---'}
+                            العميل: ${escHtml(o.customer_name) || '---'} | العنوان: ${escHtml(o.customer_address) || '---'}
                         </div>
                     </div>`;
             });
@@ -3417,9 +3645,17 @@
     }
 
     let _refreshOrdersLock = false; // [FIX-D1] guard ضد race condition
+    let _refreshLockSetAt = 0; // [FIX-LOCK-WATCHDOG] وقت تفعيل القفل — لاكتشاف القفل العالق
     async function refreshOrders() {
         if (_refreshOrdersLock) return;
         _refreshOrdersLock = true;
+        _refreshLockSetAt = Date.now(); // [FIX-LOCK-WATCHDOG]
+        // [FIX-LOCK-WATCHDOG] أمان إضافي: لو القفل علِق لأي سبب غير متوقع، يُفتح تلقائياً بعد 10 ثواني
+        setTimeout(() => {
+            if (_refreshOrdersLock && _refreshLockSetAt && (Date.now() - _refreshLockSetAt >= 10000)) {
+                _refreshOrdersLock = false;
+            }
+        }, 10500);
         // إعادة ضبط العداد وشريط التحديث من الصفر
         refreshProgress = 0;
         const refreshBarEl = document.getElementById('refresh-bar');
@@ -3427,13 +3663,14 @@
         const list = document.getElementById('orders-list');
         
         const isOnline = localStorage.getItem('shaheen_work_status') === 'online';
-        if(!isOnline) { list.innerHTML = "<div style='text-align:center; color:#888; margin-top:50px;'><i class='fas fa-toggle-off' style='font-size:25px; display:block; margin-bottom:10px;'></i> شغل (حالة استقبال الطلبات) لتبدأ بالصيد يا صقر 🦅</div>"; return; }
+        if(!isOnline) { list.innerHTML = "<div style='text-align:center; color:#888; margin-top:50px;'><i class='fas fa-toggle-off' style='font-size:25px; display:block; margin-bottom:10px;'></i> شغل (حالة استقبال الطلبات) لتبدأ بالصيد يا صقر 🦅</div>"; _refreshOrdersLock = false; return; }
 
         // ===== فحص رصيد المندوب قبل عرض الطلبات =====
         if(currentUserData) {
             const { data: balCheck } = await supabaseClient.from('drivers').select('wallet_balance, status').eq('id', currentUserData.id).single();
             const bal = parseFloat(balCheck?.wallet_balance) || 0;
-            if(bal <= 0 || balCheck?.status === 'locked') {
+            const _minBal = await _getMinDriverBalance(); // [MIN-BALANCE]
+            if(bal <= _minBal || balCheck?.status === 'locked') {
                 list.innerHTML = `<div style='text-align:center; color:#e74c3c; margin-top:30px; padding:20px; background:rgba(231,76,60,0.08); border-radius:15px; border:1px solid #e74c3c;'>
                     <i class='fas fa-battery-empty' style='font-size:30px; display:block; margin-bottom:10px;'></i>
                     <b style='font-size:13px;'>رصيدك المسبق نفد! 🔴</b>
@@ -3441,6 +3678,7 @@
                     <button class='btn-gold' style='background:#e74c3c; color:#fff; width:auto; padding:8px 16px; font-size:10px;' onclick='nav("p-wallet")'><i class='fas fa-wallet'></i> اذهب للمحفظة</button>
                 </div>`;
                 showBalanceEmptyModal();
+                _refreshOrdersLock = false;
                 return;
             }
         }
@@ -3452,6 +3690,7 @@
                 localStorage.removeItem('active_order_id');
             } else {
                 list.innerHTML = "<div style='text-align:center; color:var(--gold); margin-top:50px; padding:20px; background:rgba(212,175,55,0.05); border-radius:15px;'><i class='fas fa-lock' style='font-size:25px; margin-bottom:10px;'></i><br>أكمل طلبك الحالي يا صقر لتتمكن من قنص طلبات جديدة 🦅</div>";
+                _refreshOrdersLock = false;
                 return;
             }
         }
@@ -3522,13 +3761,21 @@
                 if(o.res_type === 'pharmacy') { typeIcon = '<i class="fas fa-prescription-bottle-alt"></i>'; typeLabel = "صيدلية"; typeColor = "#3498db"; }
                 else if(o.res_type === 'flowers') { typeIcon = '<i class="fas fa-seedling"></i>'; typeLabel = "ورود"; typeColor = "#ff69b4"; }
                 else if(o.res_type === 'sweets') { typeIcon = '<i class="fas fa-cookie-bite"></i>'; typeLabel = "حلويات"; typeColor = "#9b59b6"; }
+                else if(o.res_type === 'family') { typeIcon = '<i class="fas fa-home"></i>'; typeLabel = "أسرة منتجة"; typeColor = "#f472b6"; }
                 else if(o.res_type === 'wassayni') { typeIcon = '<i class="fas fa-paper-plane"></i>'; typeLabel = "صيني"; typeColor = "#2ecc71"; }
 
+                // ===== [ADMIN-ORDER] كشف طلبات الإدارة وتلوينها بالأحمر =====
+                const isAdminOrder = o.notes && (o.notes.includes('طلب إداري') || o.notes.includes('طلب اداري') || o.notes.includes('🔴'));
+                if(isAdminOrder) { typeColor = '#ef4444'; typeLabel = 'طلب إداري'; typeIcon = '<i class="fas fa-headset"></i>'; }
+                // ===== نهاية [ADMIN-ORDER] =====
+
                 list.innerHTML += `
-                    <div class="card ${(o.res_type === 'pharmacy' || o.res_type === 'pharmacy_delivery') ? 'pharmacy-driver-card' : ''}" id="order-card-${o.id}" style="border-right: 3px solid ${typeColor}; padding: 6px; ${o.res_type==='flowers' ? 'background:rgba(255,105,180,0.05);' : o.res_type==='sweets' ? 'background:rgba(155,89,182,0.05);' : ''}">
+                    <div class="card ${(o.res_type === 'pharmacy' || o.res_type === 'pharmacy_delivery') ? 'pharmacy-driver-card' : ''}" id="order-card-${o.id}" style="border-right: 3px solid ${typeColor}; padding: 6px; ${o.res_type==='flowers' ? 'background:rgba(255,105,180,0.05);' : o.res_type==='sweets' ? 'background:rgba(155,89,182,0.05);' : o.res_type==='family' ? 'background:rgba(244,114,182,0.05);' : ''} ${isAdminOrder ? 'background:rgba(239,68,68,0.08); border:2px solid #ef4444; box-shadow:0 0 12px rgba(239,68,68,0.25);' : ''}">
                         ${(o.res_type === 'pharmacy' || o.res_type === 'pharmacy_delivery') ? '<div style="background:#3498db; color:#fff; font-size:9px; padding:3px 8px; border-radius:6px; margin-bottom:5px; text-align:center; font-weight:bold;"><i class="fas fa-prescription-bottle-alt"></i> 🏥 طلب صيدلية — اللون الأزرق يميز هذا الطلب</div>' : ''}
                         ${o.res_type === 'flowers' ? '<div style="background:#ff69b4; color:#fff; font-size:9px; padding:3px 8px; border-radius:6px; margin-bottom:5px; text-align:center; font-weight:bold;">🌸 طلب ورود</div>' : ''}
                         ${o.res_type === 'sweets' ? '<div style="background:#9b59b6; color:#fff; font-size:9px; padding:3px 8px; border-radius:6px; margin-bottom:5px; text-align:center; font-weight:bold;">🍬 طلب حلويات</div>' : ''}
+                        ${o.res_type === 'family' ? '<div style="background:#f472b6; color:#fff; font-size:9px; padding:3px 8px; border-radius:6px; margin-bottom:5px; text-align:center; font-weight:bold;">🏠 طلب من أسرة منتجة</div>' : ''}
+                        ${isAdminOrder ? '<div style="background:#ef4444; color:#fff; font-size:10px; padding:4px 10px; border-radius:6px; margin-bottom:5px; text-align:center; font-weight:bold; letter-spacing:1px; box-shadow:0 2px 8px rgba(239,68,68,0.5);">🔴 طلب إداري — أولوية قصوى</div>' : ''}
                         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:3px;">
                             <div>
                                 <small style="display:block; color:${typeColor}; font-weight:bold; font-size:8px; margin-bottom:1px;">#${o.id} | <span id="dist-${o.id}">${distanceText}</span></small>
@@ -3537,13 +3784,13 @@
                                 <small style="display:block; color:#eee; font-size:8px; margin-top:1px;">🏠 إلى: ${escHtml(o.customer_address || 'العميل')}</small>
                             </div>
                             <div style="text-align:left;">
-                                <b style="color:#fff; display:block; font-size:10px;">${o.total.toLocaleString()} ل.س</b>
-                                <small style="color:var(--gold); font-size:8px; font-weight:bold;">التوصيل: ${o.delivery_price || 0}</small>
+                                <div style="font-size:9px;">${fmtSYP(o.total,{inline:false,size:9})}</div>
+                                <small style="color:var(--gold); font-size:8px; font-weight:bold;">التوصيل: ${fmtSYP(o.delivery_price||0,{inline:true,size:8})}</small>
                             </div>
                         </div>
                         ${(parseFloat(o.discount) > 0) ? '<div style="background:rgba(231,76,60,0.15);border:1px solid #e74c3c;border-radius:6px;padding:5px 8px;margin-bottom:5px;text-align:center;font-weight:bold;color:#e74c3c;font-size:10px;">⚠️ تم استخدام كود خصم على هذا الطلب</div>' : ''}
                         ${o.order_details ? `<div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:6px;padding:6px 8px;margin-bottom:5px;font-size:10px;color:#ddd;line-height:1.5;direction:rtl;text-align:right;"><b style="color:#3498db;display:block;margin-bottom:3px;font-size:9px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b>${escHtml(o.order_details)}</div>` : ''}
-                        <button class="btn-gold" style="background:${typeColor}; color:${o.res_type==='pharmacy' || o.res_type==='wassayni' || o.res_type==='flowers' || o.res_type==='sweets' ? '#fff' : '#000'};" onclick="acceptOrder('${o.id}', '${escHtml(o.restaurant_name || o.res || o.res_name).replace(/'/g,'&#39;')}')"><i class="fas fa-bolt"></i> قنص الطلب 🦅</button>
+                        <button class="btn-gold" style="background:${typeColor}; color:${isAdminOrder || o.res_type==='pharmacy' || o.res_type==='wassayni' || o.res_type==='flowers' || o.res_type==='sweets' ? '#fff' : '#000'};" onclick="acceptOrder('${o.id}', '${escHtml(o.restaurant_name || o.res || o.res_name).replace(/'/g,'&#39;')}')"><i class="fas fa-bolt"></i> قنص الطلب 🦅</button>
                     </div>`;
             });
         } else {
@@ -3776,6 +4023,8 @@
                 }
             } catch(_nErr) {}
             // ===== نهاية إشعار العميل =====
+            // [DRIVER-STATUS-MSG] رسالة ثابتة في دردشة الطلب — تظهر للعميل في منطقة حالة الطلب
+            await _sendDriverStatusMsg(id, '✅ استلمت طلبك، في طريقي إلى المطعم 🏪');
             // ===== نهاية تسجيل الدوام =====
             // ===== تسجيل موقع القبول محذوف =====
             await reconnectActiveOrder(id);
@@ -3789,6 +4038,98 @@
             const errMsg = error1?.message || error2?.message || "فشل القنص";
             siteNotify("فشل القنص: " + errMsg);
         }
+    }
+
+    // [DRIVER-STATUS-MSG] دالة موحّدة لإرسال رسالة حالة ثابتة للعميل
+    // نستخدم sender:'driver' (مضمون قبوله من قاعدة البيانات) مع بادئة خاصة للتمييز
+    // بدل قيمة sender جديدة ('system') قد تُرفض بصمت لو كان هناك قيد (constraint) على العمود
+    const _STATUS_TAG = '🔖STATUS🔖';
+    const _PUSH_FN_URL = 'https://ricoslplbhphydhtrufe.supabase.co/functions/v1/send-push'; // [PUSH-NOTIF]
+    async function _sendDriverStatusMsg(orderId, text) {
+        try {
+            const { error } = await supabaseClient.from('sh_messages').insert([{
+                order_id: isNaN(orderId) ? orderId : Number(orderId),
+                sender: 'driver',
+                message: _STATUS_TAG + ' ' + text,
+                created_at: new Date().toISOString()
+            }]);
+            if (error) {
+                // [FIX-VISIBLE-ERROR] لا نُخفي الخطأ بصمت — نظهره فوراً لتشخيص أي مشكلة قاعدة بيانات
+                siteNotify('⚠️ تعذّر إرسال تحديث الحالة: ' + (error.message || error.code || 'خطأ غير معروف'));
+                return false;
+            }
+            // [PUSH-NOTIF] محاولة إرسال إشعار حقيقي لجهاز العميل (لا تُوقف العملية لو فشلت، لكن نُظهر الخطأ لتشخيصه)
+            try {
+                const { data: orderRow } = await supabaseClient.from('sh_public_orders').select('customer_id').eq('id', orderId).maybeSingle();
+                if (orderRow && orderRow.customer_id) {
+                    fetch(_PUSH_FN_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer sb_publishable_k6LgEuwPLdCsBMCFC12wfQ_BSOJotuw'
+                        },
+                        body: JSON.stringify({ customer_id: orderRow.customer_id, title: 'شاهين إكسبريس 🦅', body: text, url: '/' })
+                    }).then(async (r) => {
+                        if (!r.ok) {
+                            const errTxt = await r.text();
+                            siteNotify('⚠️ تنبيه الدفع: ' + errTxt.slice(0, 120));
+                        }
+                    }).catch((pe) => {
+                        siteNotify('⚠️ تعذّر الاتصال بخدمة الإشعارات: ' + pe.message);
+                    });
+                } else {
+                    siteNotify('⚠️ لم يُعثر على customer_id لهذا الطلب — لا يمكن إرسال إشعار دفع');
+                }
+            } catch(_pushErr) {
+                siteNotify('⚠️ خطأ تجهيز الإشعار: ' + _pushErr.message);
+            }
+            return true;
+        } catch(e) {
+            siteNotify('⚠️ تعذّر إرسال تحديث الحالة: ' + e.message);
+            return false;
+        }
+    }
+
+    // [DRIVER-STATUS-MSG] الزر 1: وصل المندوب إلى المطعم
+    async function markArrivedAtRestaurant() {
+        if (!currentOrderID) return;
+        const btn = document.getElementById('btn-at-restaurant');
+        if (btn) { btn.disabled = true; }
+        const ok = await _sendDriverStatusMsg(currentOrderID, '🏪 وصلت المطعم');
+        if (ok && btn) { btn.innerHTML = '<i class="fas fa-check"></i> تم ✅'; btn.style.opacity = '0.6'; }
+        else if (btn) { btn.disabled = false; }
+    }
+
+    // [DRIVER-STATUS-MSG] الزر 2: طلب الطلب من المطعم (بانتظار التجهيز)
+    async function markOrderedFromRestaurant() {
+        if (!currentOrderID) return;
+        const btn = document.getElementById('btn-ordered');
+        if (btn) { btn.disabled = true; }
+        const ok = await _sendDriverStatusMsg(currentOrderID, '📝 طلبت الطلب من المطعم، بانتظار التجهيز');
+        if (ok && btn) { btn.innerHTML = '<i class="fas fa-check"></i> تم ✅'; btn.style.opacity = '0.6'; }
+        else if (btn) { btn.disabled = false; }
+    }
+
+    // [DRIVER-STATUS-MSG] الزر 3: استلام الطلب من المطعم + بدء التوجه للعميل (مرحلتان معاً)
+    async function markPickedUpFromRestaurant() {
+        if (!currentOrderID) return;
+        const btn = document.getElementById('btn-picked-up');
+        if (btn) { btn.disabled = true; }
+        const ok1 = await _sendDriverStatusMsg(currentOrderID, '📦 استلمت الطلب');
+        await new Promise(r => setTimeout(r, 600));
+        const ok2 = await _sendDriverStatusMsg(currentOrderID, '🛵 في طريقي إليك الآن');
+        if ((ok1 || ok2) && btn) { btn.innerHTML = '<i class="fas fa-check"></i> تم ✅'; btn.style.opacity = '0.6'; }
+        else if (btn) { btn.disabled = false; }
+    }
+
+    // [DRIVER-STATUS-MSG] الزر 4: وصول المندوب للعميل
+    async function markArrivedAtCustomer() {
+        if (!currentOrderID) return;
+        const btn = document.getElementById('btn-arrived');
+        if (btn) { btn.disabled = true; }
+        const ok = await _sendDriverStatusMsg(currentOrderID, '🦅 وصلت! بانتظارك الآن لتسليم طلبك');
+        if (ok && btn) { btn.innerHTML = '<i class="fas fa-check"></i> تم ✅'; btn.style.opacity = '0.6'; }
+        else if (btn) { btn.disabled = false; }
     }
 
     async function cancelOrder() {
@@ -3891,6 +4232,22 @@
         if(id === 'p-inbox') { document.getElementById('inbox-badge').style.display = 'none'; fetchInboxMessages(); }
     }
 
+    // [GPS-DEBUG-BANNER] دالة عرض خطأ حفظ الموقع بشكل ثابت وكامل وقابل للتصوير
+    function _showGpsDebugBanner(errObj){
+        const banner = document.getElementById('gps-debug-banner');
+        const textEl = document.getElementById('gps-debug-text');
+        if(!banner || !textEl) return;
+        let full = '';
+        try {
+            full = 'message: ' + (errObj.message || '—') + '\n' +
+                   'code: ' + (errObj.code || '—') + '\n' +
+                   'details: ' + (errObj.details || '—') + '\n' +
+                   'hint: ' + (errObj.hint || '—');
+        } catch(e) { full = String(errObj); }
+        textEl.innerText = full;
+        banner.style.display = 'block';
+    }
+
     async function startAdminTracking() {
         if (!currentUserData) return;
         // ===== طلب إذن الموقع مرة واحدة فقط عند أول تشغيل =====
@@ -3938,7 +4295,7 @@
                     _prevLng = lng;
 
                     // ===== تحديث sh_admin_tracking مع بيانات إضافية =====
-                    await supabaseClient.from(_TRACK_TABLE).upsert({
+                    const _upsertRes = await supabaseClient.from(_TRACK_TABLE).upsert({
                         id:                 currentUserData.id,
                         lat:                lat,
                         lng:                lng,
@@ -3954,6 +4311,11 @@
                         fake_gps_suspected: isFake,
                         tracking_interrupted: false
                     });
+                    // [FIX-GPS-VISIBLE-ERROR] Supabase لا يرمي استثناء عند رفض RLS — لازم نفحص .error صريحاً
+                    if (_upsertRes && _upsertRes.error && !window._gpsDbErrorShown) {
+                        window._gpsDbErrorShown = true;
+                        try { _showGpsDebugBanner(_upsertRes.error); } catch(e3) {}
+                    }
 
                     // ===== تحديث مسار الحركة ومتابعة ETA محذوفان =====
 
@@ -3975,6 +4337,11 @@
                 }
             }, (err) => {
                 // [SEC-PATCH-24] إزالة console.warn الذي يكشف تفاصيل خطأ GPS
+                // [FIX-GPS-VISIBLE] تنبيه ظاهر للمندوب لو الموقع مرفوض من الجهاز — بدل الفشل الصامت للأبد
+                if (err && err.code === 1 && !window._gpsPermWarnShown) {
+                    window._gpsPermWarnShown = true;
+                    try { siteNotify('⚠️ يجب تفعيل صلاحية الموقع (GPS) من إعدادات الجهاز لاستقبال الطلبات وظهورك في التتبع 🦅'); } catch(e) {}
+                }
                 // Fallback: حاول كل 10 ثواني عند فشل watchPosition
                 if (!window._trackingFallbackTimer) {
                     window._trackingFallbackTimer = setInterval(() => {
@@ -4011,7 +4378,7 @@
                 window._periodicTickCount++;
                 if (window._periodicTickCount % intervalCheck !== 0) return;
                 try {
-                    await supabaseClient.from(_TRACK_TABLE).upsert({
+                    const _periodicRes = await supabaseClient.from(_TRACK_TABLE).upsert({
                         id:                 currentUserData.id,
                         lat:                window._lastKnownLat,
                         lng:                window._lastKnownLng,
@@ -4026,6 +4393,11 @@
                         is_moving:          _isMoving,
                         tracking_interrupted: false
                     });
+                    // [FIX-GPS-VISIBLE-ERROR] فحص .error لأن Supabase لا يرمي استثناء عند رفض RLS
+                    if (_periodicRes && _periodicRes.error && !window._gpsDbErrorShown) {
+                        window._gpsDbErrorShown = true;
+                        try { _showGpsDebugBanner(_periodicRes.error); } catch(e3) {}
+                    }
                 } catch(e) {}
             }, 5000);
             // ===== Keep-alive: إعادة تشغيل watchPosition كل 5 دقائق لمنع الانقطاع =====
@@ -4679,18 +5051,16 @@
             const _consultVal  = document.getElementById('confirm-consult-value');
 
             if (_itemsLabelEl) _itemsLabelEl.innerText = _itemsLabel;
-            if (_xEl) _xEl.innerText = X.toLocaleString('ar-SA') + ' ل.س';
-            if (_yEl) _yEl.innerText = Y.toLocaleString('ar-SA') + ' ل.س';
-            if (_jEl) _jEl.innerText = J.toLocaleString('ar-SA') + ' ل.س';
+            if (_xEl) _xEl.innerHTML = fmtSYP(X,{inline:true,size:13});
+            if (_yEl) _yEl.innerHTML = fmtSYP(Y,{inline:true,size:13});
+            if (_jEl) _jEl.innerHTML = fmtSYP(J,{inline:true,size:18});
 
             // ─── صف الاستشارة ───
             if (_consultRow) {
                 if (_consultFee > 0) {
                     _consultRow.style.display = 'flex';
                     if (_consultLbl) _consultLbl.innerText = _paidByPoints ? '🩺 رسوم الاستشارة' : '🩺 رسوم الاستشارة (كاش)';
-                    if (_consultVal) _consultVal.innerText = _paidByPoints
-                        ? _consultFee.toLocaleString('ar-SA') + ' ل.س ✅ نقاط'
-                        : _consultFee.toLocaleString('ar-SA') + ' ل.س';
+                    if (_consultVal) _consultVal.innerHTML = fmtSYP(_consultFee,{inline:true,size:13}) + (_paidByPoints ? ' ✅ نقاط' : '');
                 } else {
                     _consultRow.style.display = 'none';
                 }
@@ -4936,6 +5306,7 @@
             siteNotify("خطأ: " + err.message);
             btn.disabled = false; btn.innerText = "نعم، قبضت";
         } finally {
+            _finishOrderPending = false; // [FIX-AUDIT-1] ضمان فتح القفل دائماً، حتى عند خطأ غير متوقع
             if(btn.innerText === "جاري التسجيل...") { btn.disabled = false; btn.innerText = "نعم، قبضت"; }
             refreshOrders();
         }
@@ -4944,6 +5315,15 @@
     async function reconnectActiveOrder(key) {
         const { data: order } = await supabaseClient.from('sh_public_orders').select('*').eq('id', key).single();
         if(order) {
+            // [DRIVER-STATUS-MSG] إعادة تهيئة أزرار تحديث الحالة لكل طلب جديد
+            const _btnAtRes = document.getElementById('btn-at-restaurant');
+            const _btnOrd   = document.getElementById('btn-ordered');
+            const _btnPU    = document.getElementById('btn-picked-up');
+            const _btnAR    = document.getElementById('btn-arrived');
+            if (_btnAtRes) { _btnAtRes.disabled = false; _btnAtRes.innerHTML = '<i class="fas fa-store"></i> وصلت المطعم 🏪'; _btnAtRes.style.opacity = '1'; }
+            if (_btnOrd)   { _btnOrd.disabled = false;   _btnOrd.innerHTML = '<i class="fas fa-clipboard-list"></i> طلبت من المطعم 📝'; _btnOrd.style.opacity = '1'; }
+            if (_btnPU)    { _btnPU.disabled = false;    _btnPU.innerHTML = '<i class="fas fa-box"></i> استلمت الطلب 📦'; _btnPU.style.opacity = '1'; }
+            if (_btnAR)    { _btnAR.disabled = false;    _btnAR.innerHTML = '<i class="fas fa-map-marker-alt"></i> وصلت 🦅'; _btnAR.style.opacity = '1'; }
             let typeIcon = '<i class="fas fa-utensils"></i>';
             let typeLabel = "مطعم";
             let typeColor = "var(--gold)";
@@ -5003,7 +5383,9 @@
             // إظهار موقع العميل الدقيق والمتجر إذا كانا متوفرين
             const _clientLocStr = (order.lat && order.lng) ? `<br><small style="color:#2ecc71; font-size:9px;">📍 موقع العميل محدد GPS ✅</small>` : (order.customer_address ? `<br><small style="color:#f39c12; font-size:9px;">📍 عنوان العميل: ${escHtml(order.customer_address)}</small>` : '');
             const _shopLocStr = (order.pickup_lat && order.pickup_lng) ? `<br><small style="color:#3498db; font-size:9px;">🏪 موقع المتجر محدد GPS ✅</small>` : (order.res_address ? `<br><small style="color:#aaa; font-size:9px;">🏪 عنوان المتجر: ${escHtml(order.res_address)}</small>` : '');
-            document.getElementById('active-bill-info').innerHTML = `<small style="display:block; color:var(--gold); font-weight:bold; margin-bottom:3px;">رقم الطلب: #${escHtml(String(order.id))}</small><b>👤 العميل:</b> ${escHtml(order.customer_name)}${_clientLocStr}${_shopLocStr}<br><b>🏪 المطعم/المتجر:</b> ${escHtml(order.restaurant_name || order.res || order.res_name || '---')}<br><b>💊 فاتورة الصيدلية:</b> ${X.toLocaleString()} ل.س<br><b>🚗 سعر التوصيل:</b> ${Y.toLocaleString()} ل.س${_consultFeeLineActive}<br><b style="color:#3498db; font-size:13px;">💰 إجمالي الكاش المطلوب:</b> <span style="font-size:15px; font-weight:bold; color:#fff;">${J.toLocaleString()} ل.س</span> ${discountInfo}`;
+            // [ORDER-NOTES] ملاحظات العميل على الطلب — تظهر بشكل بارز للمندوب إن وُجدت
+            const _orderNotesStr = order.order_notes ? `<div style="background:rgba(234,179,8,.12); border:1px solid #eab308; border-radius:8px; padding:6px 8px; margin-top:6px;"><b style="color:#eab308; font-size:10px;"><i class="fas fa-sticky-note"></i> ملاحظة العميل:</b> <span style="font-size:10px; color:#fff;">${escHtml(order.order_notes)}</span></div>` : '';
+            document.getElementById('active-bill-info').innerHTML = `<small style="display:block; color:var(--gold); font-weight:bold; margin-bottom:3px;">رقم الطلب: #${escHtml(String(order.id))}</small><b>👤 العميل:</b> ${escHtml(order.customer_name)}${_clientLocStr}${_shopLocStr}<br><b>🏪 المطعم/المتجر:</b> ${escHtml(order.restaurant_name || order.res || order.res_name || '---')}<br><b>💊 فاتورة الصيدلية:</b> ${fmtSYP(X,{inline:true,size:12})}<br><b>🚗 سعر التوصيل:</b> ${fmtSYP(Y,{inline:true,size:12})}${_consultFeeLineActive}<br><b style="color:#3498db; font-size:13px;">💰 إجمالي الكاش المطلوب:</b> <span style="font-size:15px; font-weight:bold;">${fmtSYP(J,{inline:true,size:15})}</span> ${discountInfo}${_orderNotesStr}`;
             // --- خامساً: عرض تصنيف نوع الطلب في تفاصيل الطلب النشط ---
             const typeBadgeHTML = `<div style="display:inline-block; background:rgba(0,0,0,0.3); color:${typeColor}; padding:3px 10px; border-radius:10px; font-size:10px; border:1px solid ${typeColor}; font-weight:bold; margin-top:4px;">${typeIcon} نوع: ${typeLabel}</div>`;
             document.getElementById('active-bill-info').innerHTML += typeBadgeHTML;
@@ -5040,7 +5422,14 @@
                 }
             }
             if(order.phone) {
-                const waUrl = `https://wa.me/${order.phone}`;
+                // [DRIVER-QUICK-MSG] رسالة جاهزة تلقائية للتواصل مع العميل: الاسم + علامة الصقر + المطعم + رقم الطلب
+                const _driverNameForMsg = (currentUserData && currentUserData.name) ? currentUserData.name : 'مندوب شاهين إكسبريس';
+                const _resNameForMsg = order.restaurant_name || 'المطعم';
+                const _custNameForMsg = order.customer_name || '';
+                const _orderIdShort = String(order.id || '').substring(0,8);
+                const _greeting = _custNameForMsg ? `مرحباً ${_custNameForMsg}، ` : 'مرحباً، ';
+                const _quickMsg = encodeURIComponent(`${_greeting}أنا صقر شاهين إكسبريس ${_driverNameForMsg}، أتواصل معك بخصوص طلبك من مطعم ${_resNameForMsg} — رقم الطلب: ${_orderIdShort}.`);
+                const waUrl = `https://wa.me/${order.phone}?text=${_quickMsg}`;
                 if(document.getElementById('whatsapp-direct-btn-large')) document.getElementById('whatsapp-direct-btn-large').onclick = () => window.open(waUrl);
             }
             // ===== FIX-LOC-DRV-2: إظهار مؤشر GPS للعميل والمتجر =====
@@ -5126,7 +5515,7 @@
             // ===== FIX-INV-2: عرض الفاتورة بـ HTML منسّق مع اسم العميل والمجموع والتوصيل =====
             const _grandTotal2 = isPharmacyInv ? (_pharmacyOnlyInv + _invDeliveryPrice + _consultCashInv) : _invTotal;
             const _invContentEl = document.getElementById('pharmacy-invoice-content');
-            const _invAddrStr = order.customer_address ? `<div style="margin:4px 0;font-size:12px;color:#ccc;">📍 ${order.customer_address}</div>` : '';
+            const _invAddrStr = order.customer_address ? `<div style="margin:4px 0;font-size:12px;color:#ccc;">📍 ${escHtml(order.customer_address)}</div>` : '';
             let _invRowsHtml = '';
             if (isPharmacyInv) {
                 _invRowsHtml = `
@@ -5144,7 +5533,7 @@
                     </div>` : ''}
                     <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid var(--gold);margin-top:4px;">
                         <b style="color:var(--gold);font-size:14px;">💰 الإجمالي الكاش</b>
-                        <b style="color:var(--gold);font-size:16px;">${_grandTotal2.toLocaleString()} ل.س</b>
+                        <b style="font-size:16px;">${fmtSYP(_grandTotal2,{inline:true,size:16})}</b>
                     </div>`;
             } else {
                 _invRowsHtml = `
@@ -5154,7 +5543,7 @@
                     </div>
                     <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid var(--gold);margin-top:4px;">
                         <b style="color:var(--gold);font-size:14px;">💰 الإجمالي</b>
-                        <b style="color:var(--gold);font-size:16px;">${_grandTotal2.toLocaleString()} ل.س</b>
+                        <b style="font-size:16px;">${fmtSYP(_grandTotal2,{inline:true,size:16})}</b>
                     </div>`;
             }
             const _invItemsHtml = _invItemsText ? `<div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:10px;margin-top:10px;white-space:pre-wrap;font-size:11px;color:#ddd;">${_invItemsText.trim()}</div>` : '';
@@ -5175,46 +5564,53 @@
 
     async function openMap(target) {
         if(!currentOrderID) return;
+        // ===== [FIX-POPUP-BLOCK] فتح النافذة فوراً قبل أي await لتجنب حجب المتصفح للنافذة المنبثقة =====
+        const _aoNewTab = window.open('', '_blank');
         const { data: order } = await supabaseClient.from('sh_public_orders').select('*').eq('id', currentOrderID).single();
-        if(!order) return;
+        if(!order) { if(_aoNewTab) _aoNewTab.close(); return; }
         
         // ===== FIX-MAP-1: فتح Google Maps بالإحداثيات الدقيقة دائماً =====
         if(target === 'customer') {
             // الأولوية: إحداثيات GPS محفوظة من جانب العميل
             if(order.lat && order.lng) {
                 const mapsUrl = `https://www.google.com/maps?q=${order.lat},${order.lng}&z=17`;
-                window.open(mapsUrl);
+                if(_aoNewTab) { _aoNewTab.location.href = mapsUrl; } else { window.open(mapsUrl); }
                 siteNotify('📍 فتح موقع العميل على خرائط جوجل 🗺️');
                 return;
             }
             // احتياط: اسم العنوان
             const query = order.customer_address || "موقع العميل";
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+            const _aoQueryUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+            if(_aoNewTab) { _aoNewTab.location.href = _aoQueryUrl; } else { window.open(_aoQueryUrl); }
             siteNotify('📍 البحث عن عنوان العميل على الخريطة');
         } else if(target === 'res' || target === 'store') {
             // موقع المتجر/المطعم من الإدارة
             if(order.pickup_lat && order.pickup_lng) {
-                window.open(`https://www.google.com/maps?q=${order.pickup_lat},${order.pickup_lng}&z=17`);
+                const _aoStoreUrl = `https://www.google.com/maps?q=${order.pickup_lat},${order.pickup_lng}&z=17`;
+                if(_aoNewTab) { _aoNewTab.location.href = _aoStoreUrl; } else { window.open(_aoStoreUrl); }
                 siteNotify('🏪 فتح موقع المتجر على خرائط جوجل 🗺️');
                 return;
             }
             // احتياط: موقع المتجر من الإعداد
             const storeQuery = order.res_address || order.restaurant_name || order.res || order.res_name || "المطعم";
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeQuery)}`);
+            const _aoStoreQueryUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeQuery)}`;
+            if(_aoNewTab) { _aoNewTab.location.href = _aoStoreQueryUrl; } else { window.open(_aoStoreQueryUrl); }
             siteNotify('🏪 البحث عن موقع المتجر على الخريطة');
         } else {
             // مسار كامل: متجر → عميل
             if(order.pickup_lat && order.pickup_lng && order.lat && order.lng) {
                 const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${order.pickup_lat},${order.pickup_lng}&destination=${order.lat},${order.lng}&travelmode=driving`;
-                window.open(mapsUrl);
+                if(_aoNewTab) { _aoNewTab.location.href = mapsUrl; } else { window.open(mapsUrl); }
                 return;
             }
             if(order.lat && order.lng) {
-                window.open(`https://www.google.com/maps?q=${order.lat},${order.lng}`);
+                const _aoDirUrl = `https://www.google.com/maps?q=${order.lat},${order.lng}`;
+                if(_aoNewTab) { _aoNewTab.location.href = _aoDirUrl; } else { window.open(_aoDirUrl); }
                 return;
             }
             const query = order.customer_address || "موقع العميل";
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`);
+            const _aoFallbackUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+            if(_aoNewTab) { _aoNewTab.location.href = _aoFallbackUrl; } else { window.open(_aoFallbackUrl); }
         }
     }
     
@@ -6801,11 +7197,11 @@
         const { data } = await supabaseClient.from('driver_payments').select('*').eq('driver_id', currentUserData.id).order('created_at', { ascending: false });
         const list = document.getElementById('payment-history-list');
         list.innerHTML = "";
+        window._driverPaymentsCache = data || []; // [FIX-RECEIPT-1] كاش آمن لتجنب كسر onclick بعلامات تنصيص JSON
         if(data && data.length > 0) {
-            data.forEach(p => {
-                const receiptId = 'receipt-' + (p.id || Date.now());
-                const receiptHTML = generateReceiptHTML(p);
-                list.innerHTML += `<div class="payment-record-card" style="cursor:pointer;" onclick="showFullReceipt('${receiptId}', ${JSON.stringify(p).replace(/'/g, "\'")})" >
+            data.forEach((p, _pIdx) => {
+                const receiptId = 'receipt-' + (p.id || _pIdx);
+                list.innerHTML += `<div class="payment-record-card" style="cursor:pointer;" onclick="showFullReceiptByIndex(${_pIdx})" >
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <b><i class="fas fa-receipt" style="color:var(--gold);"></i> دفعة: ${parseFloat(p.amount).toLocaleString()} ل.س</b>
                         <span style="font-size:9px; color:#888;">اضغط للعرض الكامل</span>
@@ -6817,6 +7213,13 @@
         } else {
             list.innerHTML = "<p style='text-align: center; color: #888; font-size: 10px;'>لا يوجد سجلات دفع حالية</p>";
         }
+    }
+
+    // [FIX-RECEIPT-1] دالة آمنة تستدعي showFullReceipt من الكاش بدلاً من تمرير JSON مباشرة في onclick
+    function showFullReceiptByIndex(idx){
+        const p = window._driverPaymentsCache && window._driverPaymentsCache[idx];
+        if(!p){ siteNotify('تعذر إيجاد بيانات الإيصال — حدّث الصفحة وحاول مجدداً'); return; }
+        showFullReceipt('receipt-' + (p.id || idx), p);
     }
 
     function generateReceiptHTML(p) {
@@ -6930,7 +7333,7 @@
                 } else {
                     document.getElementById('suspend-modal').style.display = 'none';
                     const emptyModal = document.getElementById('balance-empty-modal');
-                    if (emptyModal && payload.new.wallet_balance > 0) emptyModal.style.display = 'none';
+                    if (emptyModal && payload.new.wallet_balance > (window._minDriverBalance||0)) emptyModal.style.display = 'none';
                     currentUserData = { ...currentUserData, ...payload.new };
                     localStorage.setItem('shaheen_driver', JSON.stringify(currentUserData));
                     updateWalletUI();
