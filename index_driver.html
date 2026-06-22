@@ -5549,6 +5549,8 @@
             const _invItemsHtml = _invItemsText ? `<div style="background:rgba(0,0,0,0.2);border-radius:10px;padding:10px;margin-top:10px;white-space:pre-wrap;font-size:11px;color:#ddd;">${_invItemsText.trim()}</div>` : '';
             // [ORDER-DETAILS-INV] عرض نص تفاصيل الطلب في الفاتورة إذا كان موجوداً وليس فاتورة صيدلية
             const _orderDetailsInvHtml = (order.order_details && !order.order_details.includes('PHARMACY_TOTAL:')) ? `<div style="background:rgba(52,152,219,0.1);border:1px solid rgba(52,152,219,0.3);border-radius:10px;padding:10px;margin-top:10px;direction:rtl;text-align:right;"><b style="color:#3498db;display:block;font-size:11px;margin-bottom:4px;"><i class='fas fa-file-alt'></i> تفاصيل الطلب:</b><div style="font-size:11px;color:#ddd;line-height:1.6;white-space:pre-wrap;">${escHtml(order.order_details)}</div></div>` : '';
+            // [ORDER-NOTES-INV] ملاحظات العميل على الطلب — تظهر بشكل بارز في الفاتورة
+            const _orderNotesInvHtml = order.order_notes ? `<div style="background:rgba(234,179,8,.12);border:2px solid #eab308;border-radius:10px;padding:10px;margin-top:10px;direction:rtl;text-align:right;"><b style="color:#eab308;display:block;font-size:11px;margin-bottom:4px;"><i class="fas fa-sticky-note"></i> ملاحظة العميل:</b><div style="font-size:12px;color:#fff;line-height:1.6;white-space:pre-wrap;font-weight:bold;">${escHtml(order.order_notes)}</div></div>` : '';
             _invContentEl.innerHTML = `
                 <div style="background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.3);border-radius:12px;padding:12px;margin-bottom:10px;">
                     <div style="font-size:14px;font-weight:bold;color:#fff;margin-bottom:4px;">👤 ${_invCustomerName}</div>
@@ -5558,6 +5560,7 @@
                 <div style="text-align:left;">${_invRowsHtml}</div>
                 ${_invItemsHtml}
                 ${_orderDetailsInvHtml}
+                ${_orderNotesInvHtml}
             `;
         }
     }
