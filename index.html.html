@@ -7558,5 +7558,341 @@ ALTER TABLE public.sh_driver_daily_closings DISABLE ROW LEVEL SECURITY;
      ═══════════════════════════════════════════════════════════
 ALTER TABLE public.drivers ADD COLUMN IF NOT EXISTS active_device_id text DEFAULT NULL;
      ═══════════════════════════════════════════════════════════ -->
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     طبقة "عرض توضيحي تسجيل مندوب جديد" — DEMO OVERLAY (إضافة خارجية فقط)
+     لا تُعدّل أي عنصر أصلي في التطبيق: فقط تتفاعل مع الأزرار والحقول
+     الموجودة بالفعل عبر النقر/الكتابة البرمجية، وتضيف طبقة شرح فوقها.
+     ═══════════════════════════════════════════════════════════════════ -->
+<style>
+  #demo-launch-btn {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 999998; background: linear-gradient(135deg, #d4af37, #f3d878);
+    color: #1a051a; border: none; padding: 10px 18px; border-radius: 30px;
+    font-weight: bold; font-size: 13px; cursor: pointer; display: flex;
+    align-items: center; gap: 8px; box-shadow: 0 4px 18px rgba(212,175,55,0.5);
+    font-family: -apple-system, sans-serif;
+  }
+  #demo-launch-btn:active { transform: translateX(-50%) scale(0.96); }
+
+  #demo-caption-bar {
+    position: absolute; top: 8px; left: 4%; width: 92%; z-index: 999990;
+    background: linear-gradient(135deg, rgba(26,5,26,0.97), rgba(10,1,10,0.97));
+    border: 1.5px solid #d4af37; border-radius: 14px; padding: 10px 14px;
+    text-align: center; box-shadow: 0 6px 22px rgba(0,0,0,0.6);
+    opacity: 0; transform: translateY(-12px); transition: 0.35s ease;
+    pointer-events: none;
+  }
+  #demo-caption-bar.show { opacity: 1; transform: translateY(0); }
+  #demo-caption-bar .demo-step-tag {
+    color: #d4af37; font-size: 9px; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.5px;
+  }
+  #demo-caption-bar .demo-text {
+    color: #fff; font-size: 12px; line-height: 1.5; font-weight: 600; font-family: -apple-system, sans-serif;
+  }
+
+  #demo-controls {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    z-index: 999991; display: none; gap: 8px; background: rgba(0,0,0,0.6);
+    padding: 6px 10px; border-radius: 20px; border: 1px solid rgba(212,175,55,0.4);
+  }
+  #demo-controls.show { display: flex; }
+  #demo-controls button {
+    background: transparent; border: none; color: #d4af37; font-size: 16px; cursor: pointer; padding: 2px 6px;
+  }
+  #demo-controls span#demo-progress { color: #888; font-size: 9px; align-self: center; font-family: -apple-system, sans-serif; }
+
+  .demo-highlight {
+    position: relative !important; z-index: 999985 !important;
+    outline: 3px solid #fff !important;
+    box-shadow: 0 0 0 5px rgba(212,175,55,0.45), 0 0 24px 6px rgba(212,175,55,0.65) !important;
+    animation: demoPulse 1s ease-in-out infinite;
+  }
+  @keyframes demoPulse {
+    0%, 100% { box-shadow: 0 0 0 5px rgba(212,175,55,0.45), 0 0 24px 6px rgba(212,175,55,0.65); }
+    50%      { box-shadow: 0 0 0 9px rgba(212,175,55,0.15), 0 0 36px 10px rgba(212,175,55,0.85); }
+  }
+
+  #demo-arrow {
+    position: absolute; z-index: 999986; font-size: 26px; pointer-events: none;
+    text-shadow: 0 0 8px #000; display: none; animation: demoBounce 0.7s ease-in-out infinite;
+  }
+  @keyframes demoBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+  #demo-end-screen {
+    position: absolute; inset: 0; z-index: 999996; background: linear-gradient(160deg, #1a051a, #0a010a);
+    display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px;
+  }
+  #demo-end-screen.show { display: flex; }
+  #demo-end-screen img { width: 70px; border-radius: 50%; border: 2px solid #d4af37; margin-bottom: 14px; }
+  #demo-end-screen h2 { color: #d4af37; font-size: 16px; margin: 0 0 8px; font-family: -apple-system, sans-serif; }
+  #demo-end-screen p { color: #ccc; font-size: 11px; line-height: 1.6; margin: 0 0 18px; font-family: -apple-system, sans-serif; }
+</style>
+
+<button id="demo-launch-btn" onclick="window.__startShaheenDemo()">
+  <i class="fas fa-play-circle"></i> ابدأ العرض التوضيحي لتسجيل مندوب جديد
+</button>
+
+<div id="demo-arrow">👆</div>
+
+<div id="demo-end-screen">
+  <img src="https://i.postimg.cc/QxzPkmPf/Whats-App-Image-2026-04-10-at-6-22-30-PM-t7edrz.jpg">
+  <h2>🎉 ابدأ العمل وكسب الأرباح مع شاهين إكسبريس</h2>
+  <p>سجّل الآن وكن جزءاً من أسرع خدمة توصيل 🦅<br>سيتم مراجعة طلبك من قبل الإدارة والتواصل معك فور التفعيل</p>
+  <button class="btn-gold" style="width:auto; padding:10px 20px;" onclick="window.__replayShaheenDemo()"><i class="fas fa-redo"></i> إعادة العرض</button>
+</div>
+
+<script>
+(function() {
+  let aborted = false;
+  let totalSteps = 0, currentStepNum = 0;
+
+  function sleep(ms) {
+    return new Promise(res => {
+      const t = setTimeout(res, ms);
+      window.__demoTimeouts = window.__demoTimeouts || [];
+      window.__demoTimeouts.push(t);
+    });
+  }
+  function clearAllTimeouts() {
+    (window.__demoTimeouts || []).forEach(t => clearTimeout(t));
+    window.__demoTimeouts = [];
+  }
+
+  function getShell() {
+    return document.querySelector('.app-shell') || document.body;
+  }
+
+  function positionArrowNear(el) {
+    const arrow = document.getElementById('demo-arrow');
+    const shell = getShell();
+    if (!el) { arrow.style.display = 'none'; return; }
+    const elRect = el.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    arrow.style.display = 'block';
+    arrow.style.left = (elRect.left - shellRect.left + elRect.width / 2 - 13) + 'px';
+    arrow.style.top  = (elRect.top  - shellRect.top  - 30) + 'px';
+  }
+
+  function highlight(selector) {
+    document.querySelectorAll('.demo-highlight').forEach(e => e.classList.remove('demo-highlight'));
+    if (!selector) { positionArrowNear(null); return null; }
+    const el = document.querySelector(selector);
+    if (el) {
+      el.classList.add('demo-highlight');
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      positionArrowNear(el);
+    }
+    return el;
+  }
+
+  function caption(tag, text) {
+    const bar = document.getElementById('demo-caption-bar');
+    bar.querySelector('.demo-step-tag').textContent = tag;
+    bar.querySelector('.demo-text').textContent = text;
+    bar.classList.add('show');
+  }
+
+  function updateProgress() {
+    const el = document.getElementById('demo-progress');
+    if (el) el.textContent = currentStepNum + ' / ' + totalSteps;
+  }
+
+  async function typeInto(selector, text, speed) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.value = '';
+    el.focus();
+    for (let i = 0; i < text.length; i++) {
+      if (aborted) return;
+      el.value += text[i];
+      await sleep(speed || 45);
+    }
+    el.blur();
+  }
+
+  function clickEl(selector) {
+    const el = document.querySelector(selector);
+    if (el) el.click();
+  }
+
+  // ── تسلسل خطوات تسجيل المندوب الجديد (مطابق 100% لشاشات التطبيق الحقيقية) ──
+  const steps = [
+    async () => {
+      caption('الخطوة 0 من 8 — تسجيل الدخول', 'مرحباً بك في تطبيق شاهين إكسبريس 🦅 لتسجيل مندوب جديد اضغط على "تسجيل كمندوب جديد"');
+      const btn = highlight('#p-auth button[onclick="nav(\'p-register\')"]');
+      await sleep(2200);
+      if (btn) btn.click();
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 1 من 8 — الاسم الكامل', 'أدخل اسمك الكامل كما هو موضح في الهوية');
+      highlight('#reg-name');
+      await sleep(600);
+      await typeInto('#reg-name', 'أحمد محمد الحسن');
+      await sleep(500);
+      highlight('#p-register button[onclick="regGoToStep(2)"]');
+      await sleep(1200);
+      clickEl('#p-register button[onclick="regGoToStep(2)"]');
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 2 من 8 — رقم الجوال والعمر', 'أدخل رقم جوالك الفعّال وعمرك (يجب أن يكون بين 18 و60 سنة)');
+      highlight('#reg-phone');
+      await sleep(500);
+      await typeInto('#reg-phone', '0933123456');
+      await sleep(300);
+      highlight('#reg-age');
+      await sleep(400);
+      await typeInto('#reg-age', '27', 90);
+      await sleep(500);
+      highlight('#p-register-2 button[onclick="regGoToStep(3)"]');
+      await sleep(1200);
+      clickEl('#p-register-2 button[onclick="regGoToStep(3)"]');
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 3 من 8 — البريد الإلكتروني', 'أدخل بريدك الإلكتروني الفعّال');
+      highlight('#reg-email');
+      await sleep(500);
+      await typeInto('#reg-email', 'ahmad.example@gmail.com');
+      await sleep(500);
+      highlight('#p-register-3 button[onclick="regGoToStep(4)"]');
+      await sleep(1200);
+      clickEl('#p-register-3 button[onclick="regGoToStep(4)"]');
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 4 من 8 — المركبة والرخصة', 'اختر نوع مركبتك ونوع رخصة القيادة التي تمتلكها');
+      highlight('#vt-moto');
+      await sleep(1100);
+      clickEl('#vt-moto');
+      await sleep(700);
+      highlight('#lt-moto-lic');
+      await sleep(1100);
+      clickEl('#lt-moto-lic');
+      await sleep(700);
+      highlight('#p-register-4 button[onclick="regGoToStep(5)"]');
+      await sleep(1200);
+      clickEl('#p-register-4 button[onclick="regGoToStep(5)"]');
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 5 من 8 — نوع العمل', 'اختر طريقة العمل التي تناسبك: عمل حر أو دوام ثابت');
+      highlight('#wt-freelance');
+      await sleep(1400);
+      clickEl('#wt-freelance');
+      await sleep(800);
+      highlight('#p-register-5 button[onclick="regGoToStep(6)"]');
+      await sleep(1200);
+      clickEl('#p-register-5 button[onclick="regGoToStep(6)"]');
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 6 من 8 — المحافظة', 'اختر المحافظة التي تعمل فيها — متاحة حالياً في حماه');
+      highlight('#gov-hama');
+      await sleep(1400);
+      clickEl('#gov-hama');
+      await sleep(800);
+      highlight('#p-register-6-gov button[onclick="regGoToStep(7)"]');
+      await sleep(1200);
+      clickEl('#p-register-6-gov button[onclick="regGoToStep(7)"]');
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 7 من 8 — رفع الوثائق', 'يرجى رفع صورة الهوية الشخصية بشكل واضح');
+      highlight('#doc-box-id');
+      await sleep(1600);
+      caption('الخطوة 7 من 8 — رفع الوثائق', 'ثم قم برفع صورة رخصة السير');
+      highlight('#doc-box-license');
+      await sleep(1600);
+      caption('الخطوة 7 من 8 — رفع الوثائق', 'وأخيراً قم برفع صورة شخصية واضحة لك');
+      highlight('#doc-box-selfie');
+      await sleep(1600);
+      caption('الخطوة 7 من 8 — رفع الوثائق', 'بعد رفع الوثائق الثلاث، اضغط "التالي"');
+      highlight('#p-register-7-docs button[onclick="regGoToStep(8)"]');
+      await sleep(1400);
+      // الانتقال المباشر هنا لأغراض العرض فقط (دون رفع ملفات حقيقية)
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('p-register-8-terms').classList.add('active');
+      await sleep(500);
+    },
+    async () => {
+      caption('الخطوة 8 من 8 — الشروط والإرسال', 'اطّلع على شروط وميثاق صقور الشاهين كاملة');
+      highlight('#p-register-8-terms button[onclick="toggleTermsBox()"]');
+      await sleep(1300);
+      clickEl('#p-register-8-terms button[onclick="toggleTermsBox()"]');
+      await sleep(1600);
+      clickEl('#p-register-8-terms button[onclick="toggleTermsBox()"]');
+      await sleep(400);
+      caption('الخطوة 8 من 8 — الشروط والإرسال', 'وافق على الشروط بالضغط على مربع الموافقة');
+      highlight('#reg-terms-check-box');
+      await sleep(1300);
+      clickEl('#reg-terms-check-box');
+      await sleep(900);
+      caption('الخطوة 8 من 8 — الشروط والإرسال', 'وأخيراً اضغط "موافق وإرسال الطلب" لإرسال طلبك للإدارة 🦅');
+      highlight('#reg-submit-btn');
+      await sleep(2200);
+      // ملاحظة: لا يتم الضغط الفعلي هنا لتجنب إرسال طلب تجريبي حقيقي لقاعدة بيانات الإدارة
+      highlight(null);
+    },
+  ];
+
+  totalSteps = steps.length - 1; // لا نعد خطوة الترحيب كخطوة مرقّمة من 8
+
+  async function runDemo() {
+    aborted = false;
+    document.getElementById('demo-launch-btn').style.display = 'none';
+    document.getElementById('demo-controls').classList.add('show');
+    document.getElementById('demo-end-screen').classList.remove('show');
+    for (let i = 0; i < steps.length; i++) {
+      if (aborted) return;
+      currentStepNum = i;
+      updateProgress();
+      try { await steps[i](); } catch (e) { /* تجاهل أي خطأ مؤقت ومتابعة العرض */ }
+    }
+    if (aborted) return;
+    document.getElementById('demo-caption-bar').classList.remove('show');
+    highlight(null);
+    await sleep(600);
+    document.getElementById('demo-end-screen').classList.add('show');
+    document.getElementById('demo-controls').classList.remove('show');
+  }
+
+  window.__startShaheenDemo = function() { runDemo(); };
+  window.__replayShaheenDemo = function() {
+    document.getElementById('demo-end-screen').classList.remove('show');
+    nav('p-auth');
+    runDemo();
+  };
+  window.__stopShaheenDemo = function() {
+    aborted = true;
+    clearAllTimeouts();
+    document.getElementById('demo-caption-bar').classList.remove('show');
+    highlight(null);
+    document.getElementById('demo-controls').classList.remove('show');
+    document.getElementById('demo-launch-btn').style.display = 'flex';
+  };
+
+  // إدراج شريط الشرح وشريط التحكم داخل جسم الهاتف (app-shell) كي يظهر فوق الشاشات
+  window.addEventListener('DOMContentLoaded', function() {
+    const shell = getShell();
+    const captionBar = document.createElement('div');
+    captionBar.id = 'demo-caption-bar';
+    captionBar.innerHTML = '<span class="demo-step-tag"></span><span class="demo-text"></span>';
+    shell.appendChild(captionBar);
+
+    const controls = document.createElement('div');
+    controls.id = 'demo-controls';
+    controls.innerHTML = '<button onclick="window.__stopShaheenDemo()" title="إيقاف"><i class="fas fa-stop"></i></button><span id="demo-progress">0 / ' + totalSteps + '</span>';
+    shell.appendChild(controls);
+
+    shell.appendChild(document.getElementById('demo-arrow'));
+    shell.appendChild(document.getElementById('demo-end-screen'));
+  });
+})();
+</script>
+<!-- ═══════════ نهاية طبقة العرض التوضيحي ═══════════ -->
+
 </body>
 </html>
