@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "762798341080",
+    "project_id": "hahinexpress-driver",
+    "storage_bucket": "hahinexpress-driver.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:762798341080:android:de40a8b0e67b3c8e4dd0ad",
+        "android_client_info": {
+          "package_name": "com.shahinexpress.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDsV1BLh8rKT9edX6PlDzmgMpLRDrwpOzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
