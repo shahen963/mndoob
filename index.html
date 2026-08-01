@@ -431,8 +431,13 @@ return mapboxgl$1;
         <i class="fas fa-arrow-right"></i>
     </button>
 
+    <!-- [FEATURE-DEST-NAME] شريط اسم الوجهة أعلى الشاشة — يُملأ تلقائياً عبر Reverse Geocoding -->
+    <div id="nav-dest-name-badge" style="position:absolute; top:14px; left:14px; right:66px; z-index:11; background:rgba(212,175,55,0.95); color:#1a0d1f; border-radius:12px; padding:7px 12px; font-size:12.5px; font-weight:bold; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:none;">
+        📍 الوجهة: <span id="nav-dest-name-text">جاري التحديد...</span>
+    </div>
+
     <!-- بطاقة التعليمات العلوية (الاتجاه القادم) -->
-    <div id="nav-instruction-card" style="position:absolute; top:14px; left:14px; right:66px; z-index:10; background:rgba(20,20,20,0.92); border:1px solid var(--gold); border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:12px;">
+    <div id="nav-instruction-card" style="position:absolute; top:60px; left:14px; right:66px; z-index:10; background:rgba(20,20,20,0.92); border:1px solid var(--gold); border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:12px;">
         <div id="nav-maneuver-icon" style="font-size:26px; color:var(--gold); width:34px; text-align:center; flex-shrink:0;"><i class="fas fa-location-arrow"></i></div>
         <div style="flex:1; min-width:0;">
             <div id="nav-instruction-text" style="font-size:13px; font-weight:bold; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">جاري تحديد المسار...</div>
@@ -444,7 +449,7 @@ return mapboxgl$1;
     </div>
 
     <!-- شريط حالة عند إعادة حساب المسار -->
-    <div id="nav-rerouting-banner" style="display:none; position:absolute; top:78px; left:14px; right:14px; z-index:10; background:rgba(231,76,60,0.92); color:#fff; text-align:center; padding:8px; border-radius:10px; font-size:12px; font-weight:bold;">
+    <div id="nav-rerouting-banner" style="display:none; position:absolute; top:124px; left:14px; right:14px; z-index:10; background:rgba(231,76,60,0.92); color:#fff; text-align:center; padding:8px; border-radius:10px; font-size:12px; font-weight:bold;">
         🔄 جاري إعادة حساب أفضل مسار...
     </div>
 
@@ -1382,8 +1387,13 @@ return mapboxgl$1;
 
         <div style="display:flex; align-items:center; gap:6px;">
             <i class="fas fa-arrow-right" onclick="nav('p-main')" style="color:var(--gold); font-size: 14px;"></i>
-            <h3 id="active-res-name" style="margin:0; font-size: 14px;">تجهيز الطلب</h3>
+            <h3 id="active-res-name" style="margin:0; font-size: 14px; flex:1;">تجهيز الطلب</h3>
         </div>
+        <!-- ===== [APP-UPDATE-CHECK] زر واحد كبير بلون ذهبي — يحدّث الصفحة كاملة مباشرة ===== -->
+        <button onclick="location.reload(true)" style="width:100%; background:var(--gold); color:#1a051a; border:none; padding:11px; border-radius:10px; font-size:13px; font-weight:bold; cursor:pointer; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <i class="fas fa-rotate-right"></i> تحديث الصفحة
+        </button>
+        <!-- ===== نهاية [APP-UPDATE-CHECK] ===== -->
 
         <!-- ===== بطاقة التتبع الحي ===== -->
         <!-- [REMOVED] order-tracking-card محذوفة بناءً على طلب الإدارة -->
@@ -2143,6 +2153,22 @@ return mapboxgl$1;
         return fetch(url, { ...options, signal: controller.signal })
             .finally(() => clearTimeout(timeoutId));
     };
+    // [BUGFIX-EXTERNAL-LINKS-APK] إصلاح جذري وشامل لمشكلة الروابط الخارجية داخل الـ APK: الاستدعاء
+    // الافتراضي window.open(url) داخل WebView الخاص بـCapacitor لا يُفعِّل نظام Android لفتح التطبيق
+    // المناسب (واتساب/إنستغرام) — الحل القياسي المعتمد: تمرير target="_system" صراحة، وهذا يخلي
+    // نظام أندرويد يتعامل مع الرابط بشكل صحيح (يفتح التطبيق المثبَّت أو المتصفح كبديل). نتجاوز
+    // الدالة الأصلية عالمياً هنا بدل تعديل كل استدعاء window.open على حدة بكل أنحاء الملف (15+ موضع)
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        const _originalWindowOpen = window.open.bind(window);
+        window.open = function(url, target, features) {
+            // نحترم فقط الروابط الخارجية الحقيقية (http/https) — النوافذ الداخلية (بلا رابط) تبقى كما هي
+            if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+                return _originalWindowOpen(url, '_system');
+            }
+            return _originalWindowOpen(url, target, features);
+        };
+    }
+
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey, {
         auth: {
             persistSession: false,
@@ -2183,10 +2209,28 @@ return mapboxgl$1;
         }
         window.addEventListener('error', (event) => {
             _reportClientError(event.message, event.error?.stack, 'window.onerror');
+            _autoReloadOnError();
         });
         window.addEventListener('unhandledrejection', (event) => {
             _reportClientError('Unhandled Promise Rejection: ' + (event.reason?.message || event.reason), event.reason?.stack, 'unhandledrejection');
+            _autoReloadOnError();
         });
+
+        // [AUTO-RELOAD-WATCHDOG] لو صار أي خطأ برمجي حقيقي بالتطبيق، يحدّث الصفحة تلقائيًا بعد
+        // ثانيتين (يعطي وقت كافٍ لتسجيل الخطأ أولاً). حماية من حلقة تحديث متكررة: ما يعيد المحاولة
+        // أكتر من 3 مرات خلال آخر دقيقة — لو صار أكتر من هيك، يوقف تلقائيًا لتفادي تحديث لا نهائي
+        function _autoReloadOnError() {
+            try {
+                const now = Date.now();
+                const key = '_shahin_driver_reload_log';
+                let log = JSON.parse(sessionStorage.getItem(key) || '[]');
+                log = log.filter(t => now - t < 60000); // نحتفظ فقط بمحاولات آخر دقيقة
+                if (log.length >= 3) return; // تجاوز الحد — نوقف لتفادي حلقة تحديث لا نهائية
+                log.push(now);
+                sessionStorage.setItem(key, JSON.stringify(log));
+                setTimeout(() => location.reload(true), 2000);
+            } catch(e) { /* لو فشل حتى هذا، نتجاهل بصمت بدل ما نكسر شيئاً إضافياً */ }
+        }
     })();
 
     // [BUGFIX-CRITICAL-CHANNEL-LEAK] السبب الجذري لتجمّد التطبيق بعد عدة طلبات متتالية: الطريقة
@@ -2263,7 +2307,7 @@ return mapboxgl$1;
     //  [CURRENCY-SYS] نظام دعم العملة السورية (قديمة/جديدة)
     //  مطابق تماماً لنفس النظام في لوحة الإدارة
     // ════════════════════════════════════════════════════
-    window._currSettings = { mode:'both', newColor:'#22c55e', oldColor:'#ef4444' };
+    window._currSettings = { mode:'both', newColor:'#22c55e', oldColor:'#ef4444', isEnabled:true };
     window._loadCurrencySettings = async function(){
         try{
             const r = await fetch(supabaseUrl+'/rest/v1/app_currency_settings?select=*&id=eq.1&limit=1', {
@@ -2276,20 +2320,27 @@ return mapboxgl$1;
                 window._currSettings = {
                     mode: row.display_mode || 'both',
                     newColor: row.new_color || '#22c55e',
-                    oldColor: row.old_color || '#ef4444'
+                    oldColor: row.old_color || '#ef4444',
+                    // [FIX-CURRENCY-TOGGLE] نفس الخطأ الموجود بتطبيق العميل — العمود "is_enabled"
+                    // كان موجوداً بقاعدة البيانات لكن التطبيق ما كان يقرأه إطلاقاً
+                    isEnabled: row.is_enabled !== false,
                 };
             }
         }catch(e){ /* استخدام الإعدادات الافتراضية بصمت لو فشل الجلب */ }
     };
     window.fmtSYP = function(oldAmount, opts){
         opts = opts || {};
-        const s = window._currSettings || {mode:'both',newColor:'#22c55e',oldColor:'#ef4444'};
+        const s = window._currSettings || {mode:'both',newColor:'#22c55e',oldColor:'#ef4444',isEnabled:true};
         const oldVal = Math.round(parseFloat(oldAmount)||0);
         const newVal = Math.round(oldVal/100);
         const oldStr = oldVal.toLocaleString('en-US') + ' ل.س';
         const newStr = newVal.toLocaleString('en-US') + ' ل.س';
         const sizeStyle = opts.size ? `font-size:${opts.size}px;` : '';
         const sep = opts.inline ? ' &nbsp; ' : '<br>';
+        // [FIX-CURRENCY-TOGGLE] عند إيقاف النظام من الإدارة: رقم واحد بسيط للجميع، بدون تلوين
+        if (s.isEnabled === false) {
+            return `<span style="${sizeStyle}">${oldStr}</span>`;
+        }
         let html = '';
         // [UX-FIX-CURRENCY-EMPHASIS] الأخضر (العملة الجديدة) دائماً هو البارز بالحجم الكامل المطلوب،
         // والأحمر (العملة القديمة) دائماً أصغر وثانوي — بغض النظر عن وضع inline، بناءً على طلب المستخدم
@@ -2674,7 +2725,13 @@ return mapboxgl$1;
         if(document.getElementById('main-work-status-checkbox')) document.getElementById('main-work-status-checkbox').checked = status;
         
         await supabaseClient.from('sh_admin_tracking').upsert({ id: currentUserData.id, status: statusText });
-        if (status) setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 300);
+        if (status) {
+            setTimeout(() => { try { startAdminTracking(); } catch(e) {} }, 300);
+        } else {
+            // [FEATURE-BACKGROUND-TRACKING] إيقاف تتبع الخلفية عند "غير متاح" — لا داعي لاستهلاك
+            // البطارية بتتبع مستمر بينما المندوب لا يستقبل طلبات أصلاً
+            try { _stopBackgroundLocationWatcher(); } catch(e) {}
+        }
 
         // [FIX-WAKE-LOCK] إبقاء الشاشة مُضاءة طالما المندوب "متاح" — هذا يحل أشيع سبب لانقطاع التتبع
         // فعلياً (قفل الشاشة التلقائي بعد فترة خمول قصيرة بينما الجهاز موضوع على حامل في السيارة)،
@@ -4113,6 +4170,13 @@ return mapboxgl$1;
             ${row('🕐 وقت إنشاء الطلب', createdAt)}
             ${row('🕐 وقت التسليم', deliveredAt)}
             ${o.cancel_reason ? row('سبب الإلغاء', escHtml(o.cancel_reason), '#e74c3c') : ''}
+            <!-- [BUGFIX-ORDER-NOTES-ARCHIVE] ملاحظة العميل كانت محفوظة بالقاعدة فعلياً لكن تختفي
+                 من العرض بمجرد إغلاق الطلب — لم تكن معروضة إطلاقاً بنافذة التفاصيل ولا بطاقة الأرشيف -->
+            ${o.order_notes ? `
+            <div style="margin-top:10px; background:rgba(234,179,8,0.12); border:2px solid #eab308; border-radius:10px; padding:10px;">
+                <b style="color:#eab308; display:block; font-size:11px; margin-bottom:4px;"><i class="fas fa-sticky-note"></i> ملاحظة العميل:</b>
+                <div style="font-size:12px; color:#fff; line-height:1.6; white-space:pre-wrap; font-weight:bold;">${escHtml(o.order_notes)}</div>
+            </div>` : ''}
             <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(212,175,55,0.2);">
                 <b style="color:var(--gold); font-size:12px;"><i class="fas fa-star"></i> تقييم العميل</b>
                 ${o.customer_rating ? `
@@ -4199,6 +4263,8 @@ return mapboxgl$1;
                         <div style="margin-top:4px; font-size:8px; color:#888;">
                             العميل: ${escHtml(o.customer_name) || '---'} | العنوان: ${escHtml(o.customer_address) || '---'}
                         </div>
+                        <!-- [BUGFIX-ORDER-NOTES-ARCHIVE] ملاحظة العميل — كانت تختفي بعد إغلاق الطلب رغم بقائها بالقاعدة -->
+                        ${o.order_notes ? `<div style="margin-top:4px; background:rgba(234,179,8,.1); border:1px solid #eab308; border-radius:6px; padding:5px 8px;"><b style="color:#eab308; font-size:9px;"><i class="fas fa-sticky-note"></i> ملاحظة:</b> <span style="font-size:9px; color:#eee;">${escHtml(o.order_notes)}</span></div>` : ''}
                         <!-- [FIX-CUSTOMER-RATING-HISTORY] تقييم العميل وملاحظته — تظهر فقط للطلبات المكتملة -->
                         ${o.status === 'completed' ? `
                         <div style="margin-top:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.1);">
@@ -4241,8 +4307,12 @@ return mapboxgl$1;
                 // [FIX-PICKUP-LEAK] طلبات الاستلام من المطعم لا تصل للمندوب إطلاقاً
                 if (payload.new.service_type === 'pickup') return;
                 if (payload.new.status === 'searching' || payload.new.status === 'pending') {
-                    siteNotify("🦅 صيد جديد! طلب من " + (payload.new.restaurant_name || payload.new.res || payload.new.res_name));
-                    refreshOrders();
+                    // [BUGFIX-CRITICAL-FREEZE-UNFILTERED-REALTIME] نفس الحماية — لا داعي لإشعار
+                    // المندوب بطلبات جديدة أو إعادة بناء القائمة طالما هو مشغول فعلياً بطلب نشط حالياً
+                    if (!currentOrderID) {
+                        siteNotify("🦅 صيد جديد! طلب من " + (payload.new.restaurant_name || payload.new.res || payload.new.res_name));
+                        refreshOrders();
+                    }
                 }
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sh_public_orders' }, payload => {
@@ -4300,7 +4370,18 @@ return mapboxgl$1;
                         loadFullHistoryUI();
                     }
                 }
-                refreshOrders();
+                // [BUGFIX-CRITICAL-FREEZE-UNFILTERED-REALTIME] السبب الجذري للتجمّد الكامل بعد استلام
+                // الطلب: كانت هذي الدالة الثقيلة (تُعيد بناء قائمة الطلبات بالكامل) تُستدعى عند أي
+                // تحديث لأي طلب بالنظام كله — حتى لو كان التحديث لطلب عميل آخر لا علاقة له بالمندوب
+                // إطلاقاً! بنظام فيه عشرات الطلبات المتزامنة، هذا يخلق سلسلة استدعاءات متلاحقة بدون
+                // أي توقف، تُنافس على معالج الأحداث الوحيد بالمتصفح وتُشعر الواجهة بتجمّد كامل (لا
+                // استجابة للأزرار، حالة قديمة، إلخ) — رغم إن الطلب نفسه لم يختفِ فعلياً من القاعدة،
+                // فقط الواجهة عالقة بمعالجة متتالية لا تنتهي. الحل: طالما المندوب يعمل فعلياً على طلب
+                // نشط (currentOrderID موجود)، لا داعي لإعادة بناء قائمة "الطلبات المتاحة" أصلاً —
+                // آلية تحديث الطلب النشط نفسه مستقلة تماماً (reconnectActiveOrder + _startActiveOrderPoll)
+                if (!currentOrderID) {
+                    refreshOrders();
+                }
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'sh_public_orders' }, payload => {
                 if (payload.old && payload.old.id === currentOrderID) {
@@ -5122,10 +5203,14 @@ return mapboxgl$1;
             try {
                 const { data: orderRow } = await _withTimeout(supabaseClient.from('sh_public_orders').select('customer_id').eq('id', orderId).maybeSingle(), 8000);
                 if (orderRow && orderRow.customer_id) {
+                    // [BUGFIX-NOTIF-ORDER-LINK] كان الإدخال لا يحدّد reference_id إطلاقاً — الدالة
+                    // الخادمية (Trigger) تعتمد على هذا العمود بالضبط لتمرير order_id لحمولة الإشعار،
+                    // فبدونه يصل order_id فارغاً دائماً ولا يفتح الإشعار الطلب الصحيح عند الضغط عليه
                     const { error: notifErr } = await supabaseClient.from('notifications').insert([{
                         user_id: orderRow.customer_id,
                         message: '🦅 ' + text,
-                        type: 'order_status'
+                        type: 'order_status',
+                        reference_id: String(orderId)
                     }]);
                     if (notifErr) siteNotify('⚠️ تعذّر إرسال إشعار الحالة: ' + notifErr.message);
                 } else {
@@ -5399,8 +5484,69 @@ return mapboxgl$1;
         banner.style.display = 'block';
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // [FEATURE-BACKGROUND-TRACKING] تتبع الموقع بالخلفية — يستمر حتى بعد خروج
+    // المندوب من واجهة التطبيق تماماً (تصغيره أو التبديل لتطبيق آخر). يعتمد
+    // على خدمة أندرويد أمامية حقيقية (Foreground Service) عبر إضافة مخصصة،
+    // بعكس watchPosition العادية اللي يُعلِّقها نظام أندرويد بمجرد خروج
+    // الواجهة من الشاشة (قيد أساسي بمنصة أندرويد نفسها، مو خطأ برمجي بالتطبيق)
+    // ══════════════════════════════════════════════════════════════════════
+    let _bgWatcherId = null;
+    async function _startBackgroundLocationWatcher() {
+        try {
+            if (!window.Capacitor || !window.Capacitor.isNativePlatform || !window.Capacitor.isNativePlatform()) return; // نسخة الويب لا تدعم هذا أصلاً (قيد المتصفحات نفسها)
+            if (_bgWatcherId) return; // شغّال أصلاً، لا نكرر التشغيل
+            const BG = window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+            if (!BG) { console.warn('[FEATURE-BACKGROUND-TRACKING] الإضافة غير محمَّلة'); return; }
+            _bgWatcherId = await BG.addWatcher({
+                backgroundTitle: 'شاهين إكسبريس 🦅',
+                backgroundMessage: 'التتبع الحي شغّال — يقدر العميل والإدارة يشوفوا موقعك',
+                requestPermissions: true,
+                stale: false,
+                distanceFilter: 15 // تحديث كل 15 متر حركة فقط — يوازن بين دقة التتبع واستهلاك البطارية
+            }, async (position, error) => {
+                if (error || !position || !currentUserData) return;
+                try {
+                    // [FIX-NO-DUPLICATE-WRITE] لا نكتب هنا إلا لما يكون التطبيق فعلياً بالخلفية —
+                    // بالواجهة الأمامية، watchPosition العادية (الأدق والأكثر تفصيلاً) هي المسؤولة،
+                    // فتجنّباً لتضارب الكتابات المتزامنة على نفس الصف بمصدرين مختلفين في نفس اللحظة
+                    if (document.visibilityState !== 'hidden') return;
+                    await supabaseClient.from(_TRACK_TABLE).upsert({
+                        id: currentUserData.id,
+                        lat: position.latitude,
+                        lng: position.longitude,
+                        accuracy: position.accuracy,
+                        speed: position.speed || 0,
+                        heading: position.bearing || 0,
+                        last_seen: new Date().toISOString(),
+                        last_update: new Date().toISOString(),
+                        name: currentUserData.name,
+                        status: localStorage.getItem('shaheen_work_status') || 'offline',
+                        active_order_id: currentOrderID || null,
+                        tracking_interrupted: false
+                    });
+                    window._lastKnownLat = position.latitude;
+                    window._lastKnownLng = position.longitude;
+                } catch(e) { console.error('[FEATURE-BACKGROUND-TRACKING] خطأ أثناء حفظ موقع الخلفية:', e); }
+            });
+        } catch(e) {
+            console.error('[FEATURE-BACKGROUND-TRACKING] فشل تشغيل تتبع الخلفية:', e);
+            _bgWatcherId = null;
+        }
+    }
+    async function _stopBackgroundLocationWatcher() {
+        try {
+            if (!_bgWatcherId) return;
+            const BG = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.BackgroundGeolocation;
+            if (BG) await BG.removeWatcher({ id: _bgWatcherId });
+        } catch(e) {} finally { _bgWatcherId = null; }
+    }
+
     async function startAdminTracking() {
         if (!currentUserData) return;
+        // [FEATURE-BACKGROUND-TRACKING] تشغيل تتبع الخلفية بالتوازي — مرة واحدة هنا تغطي كل نقاط
+        // استدعاء startAdminTracking الحالية بالملف بدون تعديل كل واحدة منها يدوياً
+        _startBackgroundLocationWatcher();
         // [FIX-NO-REPEAT-PROMPT] إذا كان التتبع يعمل بالفعل (gpsWatch نشط)، لا نعيد تشغيله أو نطلب الإذن من جديد —
         // إعادة تشغيله من كل ضغطة زر هي السبب الأرجح لتكرار طلب إذن الموقع وتعليق الواجهة لحظياً عند كل ضغطة
         if (gpsWatch) return;
@@ -6090,6 +6236,7 @@ return mapboxgl$1;
         if (window._shiftTimer)             { clearInterval(window._shiftTimer); window._shiftTimer = null; }
         if (window._shiftHeartbeat)         { clearInterval(window._shiftHeartbeat); window._shiftHeartbeat = null; }
         if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
+        try { _stopBackgroundLocationWatcher(); } catch(e) {} // [FEATURE-BACKGROUND-TRACKING]
         _releaseRefreshLock(); _acceptOrderPending = false; _finishOrderPending = false;
         // [FIX-LOGOUT-HANG] مسح البيانات المحلية وتسجيل الخروج أولاً بدون انتظار الشبكة
         const _logoutUserId = currentUserData && currentUserData.id ? currentUserData.id : 'default';
@@ -6930,7 +7077,7 @@ return mapboxgl$1;
                 const _orderIdShort = String(order.id || '').substring(0,8);
                 const _greeting = _custNameForMsg ? `مرحباً ${_custNameForMsg}، ` : 'مرحباً، ';
                 const _quickMsg = encodeURIComponent(`${_greeting}أنا صقر شاهين إكسبريس ${_driverNameForMsg}، أتواصل معك بخصوص طلبك من مطعم ${_resNameForMsg} — رقم الطلب: ${_orderIdShort}.`);
-                const waUrl = `https://wa.me/${order.phone}?text=${_quickMsg}`;
+                const waUrl = `https://wa.me/${String(order.phone||'').replace(/[^0-9]/g,'')}?text=${_quickMsg}`;
                 if(document.getElementById('whatsapp-direct-btn-large')) document.getElementById('whatsapp-direct-btn-large').onclick = () => window.open(waUrl);
             }
             // ===== FIX-LOC-DRV-2: إظهار مؤشر GPS للعميل والمتجر =====
@@ -6938,6 +7085,19 @@ return mapboxgl$1;
             const _storeGpsBadge = document.getElementById('store-gps-indicator');
             if (_clientGpsBadge) _clientGpsBadge.style.display = (order.lat && order.lng) ? 'block' : 'none';
             if (_storeGpsBadge) _storeGpsBadge.style.display = (order.pickup_lat && order.pickup_lng) ? 'block' : 'none';
+            // [FEATURE-WASSAYNI-PICKUP-DROPOFF-LABELS] تسميات مخصَّصة لخدمة وصّيني — "متجر/عميل" لا
+            // تعني شيئاً بخدمة توصيل من نقطة لنقطة، فنستبدلها بـ"استلام/تسليم" الأوضح لهذي الحالة فقط
+            const _btnStoreLocEl = document.getElementById('btn-store-loc');
+            const _btnClientLocEl = document.getElementById('btn-client-loc');
+            if (_btnStoreLocEl && _btnClientLocEl) {
+                if (order.res_type === 'wassayni') {
+                    _btnStoreLocEl.innerHTML = '<i class="fas fa-map-marker-alt" style="color:#74b9ff;"></i> 📦 موقع الاستلام<div id="store-gps-indicator" style="font-size:7px;color:#a8d5ff;display:' + ((order.pickup_lat && order.pickup_lng) ? 'block' : 'none') + ';">GPS محفوظ ✅</div>';
+                    _btnClientLocEl.innerHTML = '<i class="fas fa-flag-checkered" style="color:#2ecc71;"></i> 🏁 موقع التسليم<div id="client-gps-indicator" style="font-size:7px;color:#a8ffcb;display:' + ((order.lat && order.lng) ? 'block' : 'none') + ';">GPS محفوظ ✅</div>';
+                } else {
+                    _btnStoreLocEl.innerHTML = '<i class="fas fa-store" style="color:#74b9ff;"></i> 🏪 موقع المتجر<div id="store-gps-indicator" style="font-size:7px;color:#a8d5ff;display:' + ((order.pickup_lat && order.pickup_lng) ? 'block' : 'none') + ';">GPS محفوظ ✅</div>';
+                    _btnClientLocEl.innerHTML = '<i class="fas fa-map-marker-alt" style="color:#2ecc71;"></i> 📍 موقع العميل<div id="client-gps-indicator" style="font-size:7px;color:#a8ffcb;display:' + ((order.lat && order.lng) ? 'block' : 'none') + ';">GPS محفوظ ✅</div>';
+                }
+            }
             // ===== تشغيل عداد وقت الطلب وتتبع المسافة =====
             // [REMOVED] startOrderTimer / _updateDistanceToClient محذوفة
         }
@@ -7260,6 +7420,12 @@ return mapboxgl$1;
                 _navReadyQueue.forEach(fn => { try { fn(); } catch(e){} });
                 _navReadyQueue = [];
                 setTimeout(() => _navMap.resize(), 150);
+                // [FEATURE-FREE-MAP-INTERACTION] أي تفاعل يدوي حقيقي من المندوب (سحب أو تكبير بإصبعه)
+                // يوقف وضع المتابعة التلقائية فوراً، فتبقى الخريطة بالمكان اللي اختاره هو بالضبط —
+                // لا نستخدم حدث 'move' لأنه يُطلَق أيضاً أثناء easeTo البرمجي (متابعة موقع المندوب)
+                _navMap.on('dragstart', () => { _navFollowMode = false; _navUpdateRecenterBtnState(); });
+                _navMap.on('zoomstart', (e) => { if (e.originalEvent) { _navFollowMode = false; _navUpdateRecenterBtnState(); } });
+                _navMap.on('rotatestart', (e) => { if (e.originalEvent) { _navFollowMode = false; _navUpdateRecenterBtnState(); } });
             } catch(e) { console.error('nav map setup error', e); }
         };
         if (_navMap.isStyleLoaded()) _doSetup();
@@ -7486,6 +7652,38 @@ return mapboxgl$1;
 
     // [NAV-RESOLVE] حل الوجهة بسلسلة احتياطية كاملة (نفس النمط المُثبَت في باقي النظام) — لا يعتمد فقط
     // على ما هو محفوظ مباشرة على الطلب، بل يبحث في جدول المطعم/العميل ويحل روابط خرائط جوجل إن وُجدت
+    // [FEATURE-DEST-NAME] استخراج اسم الوجهة تلقائياً من الإحداثيات (معلم قريب، شارع، أو حي)
+    async function _navReverseGeocodeDestination(lat, lng) {
+        const badge = document.getElementById('nav-dest-name-badge');
+        const textEl = document.getElementById('nav-dest-name-text');
+        if (!badge || !textEl) return;
+        badge.style.display = 'block';
+        textEl.innerText = 'جاري التحديد...';
+        try {
+            const _DRIVER_MAPBOX_TOKEN = 'pk.eyJ1IjoiZGZnaHJ0c2ZnaGoiLCJhIjoiY21xdTdtOXl6MHBhbDJzcXl1NnJiNDQ5ZyJ9.hjFDXHtLhfb_rnVbMcp7jQ';
+            // نطلب أنواعاً متدرجة: معلم/مكان (poi) أولاً، ثم عنوان، ثم حي — Mapbox يرجع أقرب نتيجة متاحة لكل نوع
+            const _url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=poi,address,neighborhood,locality&language=ar&access_token=${_DRIVER_MAPBOX_TOKEN}`;
+            const resp = await fetch(_url);
+            const data = await resp.json();
+            let name = null;
+            if (data && data.features && data.features.length > 0) {
+                // نفضّل أقرب نتيجة POI (معلم/مطعم/مسجد...) إن وُجدت، وإلا أول نتيجة متاحة (عنوان/حي)
+                const poi = data.features.find(f => f.place_type && f.place_type.includes('poi'));
+                name = (poi || data.features[0]).text;
+                // نضيف اسم الحي/المنطقة كتفصيل إضافي لو مختلف عن الاسم الأساسي
+                const context = (poi || data.features[0]).context || [];
+                const neighborhood = context.find(c => c.id && (c.id.startsWith('neighborhood') || c.id.startsWith('locality')));
+                if (neighborhood && neighborhood.text && neighborhood.text !== name) {
+                    name = `${name} — ${neighborhood.text}`;
+                }
+            }
+            textEl.innerText = name || 'موقع غير معروف الاسم';
+        } catch(e) {
+            console.error('[FEATURE-DEST-NAME] فشل تحديد اسم الوجهة:', e);
+            textEl.innerText = 'تعذّر تحديد الاسم';
+        }
+    }
+
     async function _navResolveDestination(target, order) {
         if (target === 'customer') {
             let lat = parseFloat(order.lat), lng = parseFloat(order.lng);
@@ -7597,12 +7795,16 @@ return mapboxgl$1;
             return;
         }
         let destLat = resolved.lat, destLng = resolved.lng, destLabel, destIcon;
-        if (target === 'customer') { destLabel = 'متجه إلى العميل'; destIcon = '🏠'; }
-        else { destLabel = 'متجه إلى المطعم'; destIcon = '🏪'; }
+        // [FEATURE-WASSAYNI-PICKUP-DROPOFF-LABELS] نفس منطق تسميات البطاقة — "استلام/تسليم" بدل
+        // "مطعم/عميل" لخدمة وصّيني تحديداً، لأن "مطعم" لا معنى له بخدمة توصيل من نقطة لنقطة
+        const _isWassayniNav = order.res_type === 'wassayni';
+        if (target === 'customer') { destLabel = _isWassayniNav ? 'متجه إلى موقع التسليم 🏁' : 'متجه إلى العميل'; destIcon = _isWassayniNav ? '🏁' : '🏠'; }
+        else { destLabel = _isWassayniNav ? 'متجه إلى موقع الاستلام 📦' : 'متجه إلى المطعم'; destIcon = _isWassayniNav ? '📦' : '🏪'; }
         _navCurrentTarget = target;
         _navCurrentDest = { lat: destLat, lng: destLng };
         document.getElementById('nav-destination-label').innerText = destLabel;
         document.getElementById('nav-destination-icon').innerText = destIcon;
+        _navReverseGeocodeDestination(destLat, destLng); // [FEATURE-DEST-NAME]
 
         const startLat = window._lastKnownLat || destLat;
         const startLng = window._lastKnownLng || destLng;
@@ -7627,17 +7829,36 @@ return mapboxgl$1;
             } catch(e) {}
         });
         _navFollowMode = true;
+        _navUpdateRecenterBtnState();
         _navStartPositionFeed();
     };
 
     window.closeNavigationPage = function() {
         document.getElementById('nav-page').style.display = 'none';
+        const badge = document.getElementById('nav-dest-name-badge');
+        if (badge) badge.style.display = 'none';
         _navStopPositionFeed();
         if (_navAnimFrame) cancelAnimationFrame(_navAnimFrame);
     };
 
+    // [FEATURE-FREE-MAP-INTERACTION] تمييز بصري لزر إعادة التمركز لما يكون المندوب قد حرّك الخريطة يدوياً
+    function _navUpdateRecenterBtnState() {
+        const btn = document.getElementById('nav-recenter-btn');
+        if (!btn) return;
+        if (_navFollowMode) {
+            btn.style.background = 'rgba(20,20,20,0.85)';
+            btn.style.color = 'var(--gold)';
+            btn.style.boxShadow = 'none';
+        } else {
+            btn.style.background = 'var(--gold)';
+            btn.style.color = '#1a0d1f';
+            btn.style.boxShadow = '0 0 12px rgba(212,175,55,0.7)';
+        }
+    }
+
     window._navRecenter = function() {
         _navFollowMode = true;
+        _navUpdateRecenterBtnState();
         if (_navMarkerCur && _navMap) _navMap.easeTo({ center: _navMarkerCur, zoom: 17, duration: 600 });
     };
 
@@ -7652,8 +7873,10 @@ return mapboxgl$1;
             if (!resolved) { siteNotify('⚠️ موقع العميل غير متوفر للملاحة التلقائية في أي مصدر — يُرجى إغلاق الملاحة واستخدام العنوان النصي'); return; }
             _navCurrentTarget = 'customer';
             _navCurrentDest = resolved;
-            document.getElementById('nav-destination-label').innerText = 'متجه إلى العميل';
-            document.getElementById('nav-destination-icon').innerText = '🏠';
+            const _isWassayniSwitch = freshOrder.res_type === 'wassayni';
+            document.getElementById('nav-destination-label').innerText = _isWassayniSwitch ? 'متجه إلى موقع التسليم 🏁' : 'متجه إلى العميل';
+            document.getElementById('nav-destination-icon').innerText = _isWassayniSwitch ? '🏁' : '🏠';
+            _navReverseGeocodeDestination(resolved.lat, resolved.lng); // [FEATURE-DEST-NAME]
             document.getElementById('nav-instruction-text').innerText = 'جاري تحديد مسار جديد للعميل...';
             const lat = window._lastKnownLat || _navCurrentDest.lat;
             const lng = window._lastKnownLng || _navCurrentDest.lng;
